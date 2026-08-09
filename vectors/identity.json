@@ -1,0 +1,91 @@
+{
+  "description": "Cross-signing chains: identity key -> self-signing key -> device key (spec 3.6).",
+  "seeds": {
+    "device": "0303030303030303030303030303030303030303030303030303030303030303",
+    "identity": "0101010101010101010101010101010101010101010101010101010101010101",
+    "impostor": "0909090909090909090909090909090909090909090909090909090909090909",
+    "self_signing": "0202020202020202020202020202020202020202020202020202020202020202"
+  },
+  "vectors": [
+    {
+      "bundle": {
+        "devices": [
+          {
+            "gid": "diprish",
+            "key_id": "DEVKEY:AB12",
+            "purpose": "device",
+            "signature": "21dcb0dbd49a494e8321818b4896f869174a8dde0158511dca06f975cdbea90030f9a23c9fbe55a14329b9975974a7531d61556d5708c6dda840d2f5ea701d03",
+            "subject_key": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+          }
+        ],
+        "gid": "diprish",
+        "identity_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "level": "1",
+        "self_signing": {
+          "gid": "diprish",
+          "key_id": "SSK:0001",
+          "purpose": "self-signing",
+          "signature": "9d2d4a76d208bc4989d3c425fe24f3b268b6c135e76229de2c1f67b7a53969bcb173a2ad4d89dfcd0e960d9056690400f6809defb2d025be4ad918530b2ca00e",
+          "subject_key": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+        }
+      },
+      "name": "sound chain",
+      "resolves": {
+        "DEVKEY:AB12": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+      },
+      "verifies": true
+    },
+    {
+      "bundle": {
+        "devices": [
+          {
+            "gid": "diprish",
+            "key_id": "DEVKEY:AB12",
+            "purpose": "device",
+            "signature": "5d9762a3197f1adc77695ee82ad89497bab3fb1e212ece85b04ccd4c5d587c6e4238dbc5d989177b65d26576e5bcc420291cc3dcd0d6d3485158136b6cde0206",
+            "subject_key": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618"
+          }
+        ],
+        "gid": "diprish",
+        "identity_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "level": "1",
+        "self_signing": {
+          "gid": "diprish",
+          "key_id": "SSK:0001",
+          "purpose": "self-signing",
+          "signature": "9d2d4a76d208bc4989d3c425fe24f3b268b6c135e76229de2c1f67b7a53969bcb173a2ad4d89dfcd0e960d9056690400f6809defb2d025be4ad918530b2ca00e",
+          "subject_key": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+        }
+      },
+      "name": "device signed by an uncertified key",
+      "reason": "BadCertificate",
+      "verifies": false
+    },
+    {
+      "bundle": {
+        "devices": [
+          {
+            "gid": "mallory",
+            "key_id": "DEVKEY:AB12",
+            "purpose": "device",
+            "signature": "54afb6fe4746f9259d107a9f5304d082a04b080d3432d8b3c76a692f44dc3216f75cc8e1316f45d3648bc85147058eaae29e92b7eb7d26aafe746deb4c97e00c",
+            "subject_key": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+          }
+        ],
+        "gid": "diprish",
+        "identity_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "level": "1",
+        "self_signing": {
+          "gid": "diprish",
+          "key_id": "SSK:0001",
+          "purpose": "self-signing",
+          "signature": "9d2d4a76d208bc4989d3c425fe24f3b268b6c135e76229de2c1f67b7a53969bcb173a2ad4d89dfcd0e960d9056690400f6809defb2d025be4ad918530b2ca00e",
+          "subject_key": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+        }
+      },
+      "name": "certificate borrowed from another identity",
+      "reason": "GidMismatch",
+      "verifies": false
+    }
+  ]
+}

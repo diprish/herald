@@ -1,0 +1,19 @@
+[package]
+name = "herald-core"
+description = "Shared HERALD protocol core: canonical serialization, event signing, cross-signing, log validation, and trust-chain evaluation."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+ed25519-dalek = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
+
+[features]
+default = []

@@ -1,0 +1,109 @@
+{
+  "description": "Signed events (spec 4.1). The signature covers the canonical form of every field except `event_id` and `signature`; `event_id` is SHA-512 of that same payload, truncated to 32 hex characters, prefixed with `$` and suffixed with `:<origin_server>`.",
+  "device_seed": "0303030303030303030303030303030303030303030303030303030303030303",
+  "vectors": [
+    {
+      "event": {
+        "content": {
+          "format": "text/herald",
+          "text": "Hi, please find the Q3 numbers attached."
+        },
+        "created_at": "2026-07-21T09:32:00.000Z",
+        "device_key_id": "DEVKEY:AB12",
+        "event_id": "$c84543b95bc2fdfe0682df30eb91558d:herald.deloitte.com",
+        "origin_server": "herald.deloitte.com",
+        "prev_event": null,
+        "sender": "diprish:deloitte",
+        "seq": 1,
+        "signature": "86a1f07070167d0911131cbf0af2ae97d5233e9d3af6773ebe2b347acff35f76d42e7d26128725ae53fbfd5aded42399f2186b8a368db23d754ac1660c62270a",
+        "thread_id": "!01J8X2M0AB:herald.deloitte.com",
+        "type": "h.message"
+      },
+      "expected_event_id": "$c84543b95bc2fdfe0682df30eb91558d:herald.deloitte.com",
+      "name": "first event in a thread",
+      "signing_payload": "{\"content\":{\"format\":\"text/herald\",\"text\":\"Hi, please find the Q3 numbers attached.\"},\"created_at\":\"2026-07-21T09:32:00.000Z\",\"device_key_id\":\"DEVKEY:AB12\",\"origin_server\":\"herald.deloitte.com\",\"prev_event\":null,\"sender\":\"diprish:deloitte\",\"seq\":1,\"thread_id\":\"!01J8X2M0AB:herald.deloitte.com\",\"type\":\"h.message\"}"
+    },
+    {
+      "event": {
+        "content": {
+          "key": "+1"
+        },
+        "created_at": "2026-07-21T09:33:00.000Z",
+        "device_key_id": "DEVKEY:AB12",
+        "event_id": "$97505f93d26c755db3018860f436e143:herald.deloitte.com",
+        "origin_server": "herald.deloitte.com",
+        "prev_event": "$0000000000000000000000000000000f:herald.deloitte.com",
+        "sender": "diprish:deloitte",
+        "seq": 2,
+        "signature": "32433d58b51dda7823dcb4560f7c407f1076d81f2050ac252c6f8561bc3acb43cdb2115c9b185ac5ff6cce7f7e3c231d22263fe41867dd99796de85589946f0a",
+        "thread_id": "!01J8X2M0AB:herald.deloitte.com",
+        "type": "h.react"
+      },
+      "expected_event_id": "$97505f93d26c755db3018860f436e143:herald.deloitte.com",
+      "name": "linked second event",
+      "signing_payload": "{\"content\":{\"key\":\"+1\"},\"created_at\":\"2026-07-21T09:33:00.000Z\",\"device_key_id\":\"DEVKEY:AB12\",\"origin_server\":\"herald.deloitte.com\",\"prev_event\":\"$0000000000000000000000000000000f:herald.deloitte.com\",\"sender\":\"diprish:deloitte\",\"seq\":2,\"thread_id\":\"!01J8X2M0AB:herald.deloitte.com\",\"type\":\"h.react\"}"
+    },
+    {
+      "event": {
+        "content": {
+          "membership": "join"
+        },
+        "created_at": "2026-07-21T10:00:00.000Z",
+        "device_key_id": "DEVKEY:AB12",
+        "event_id": "$a6467d0a75bba1b45cb8394f11a51ea8:herald.example.com",
+        "origin_server": "herald.example.com",
+        "prev_event": null,
+        "sender": "diprish",
+        "seq": 1,
+        "signature": "29409cdf53569076bae3d231e1fef41704d84ea0ccd2b8b4436aad2472ca585d1c1d8a4381e02aed1d70c20fe29776da412515b66d7e7818a2b32d2c9d363400",
+        "thread_id": "!01J8X2M0AC:herald.example.com",
+        "type": "h.member"
+      },
+      "expected_event_id": "$a6467d0a75bba1b45cb8394f11a51ea8:herald.example.com",
+      "name": "bare gid sender",
+      "signing_payload": "{\"content\":{\"membership\":\"join\"},\"created_at\":\"2026-07-21T10:00:00.000Z\",\"device_key_id\":\"DEVKEY:AB12\",\"origin_server\":\"herald.example.com\",\"prev_event\":null,\"sender\":\"diprish\",\"seq\":1,\"thread_id\":\"!01J8X2M0AC:herald.example.com\",\"type\":\"h.member\"}"
+    },
+    {
+      "event": {
+        "content": {
+          "title": "20% off",
+          "valid_until": "2026-08-15T00:00:00Z"
+        },
+        "created_at": "2026-07-21T11:00:00.000Z",
+        "device_key_id": "DEVKEY:AB12",
+        "event_id": "$b24f1472286349f4a8d241921bee122c:herald.example.com",
+        "origin_server": "herald.example.com",
+        "prev_event": null,
+        "sender": "diprish:deloitte",
+        "seq": 1,
+        "signature": "4d785301138a8661b8a64ce99cb4e5d464d2c9514b84d216d92458b6dbec82fa06c3408f442ebe841d9f0d77cf4d2fce7b1ba30adf080e9dec8c7f316e2dff08",
+        "thread_id": "!01J8X2M0AD:herald.example.com",
+        "type": "h.offer"
+      },
+      "expected_event_id": "$b24f1472286349f4a8d241921bee122c:herald.example.com",
+      "name": "unknown event type relays unchanged",
+      "signing_payload": "{\"content\":{\"title\":\"20% off\",\"valid_until\":\"2026-08-15T00:00:00Z\"},\"created_at\":\"2026-07-21T11:00:00.000Z\",\"device_key_id\":\"DEVKEY:AB12\",\"origin_server\":\"herald.example.com\",\"prev_event\":null,\"sender\":\"diprish:deloitte\",\"seq\":1,\"thread_id\":\"!01J8X2M0AD:herald.example.com\",\"type\":\"h.offer\"}"
+    }
+  ],
+  "verification_bundle": {
+    "devices": [
+      {
+        "gid": "diprish",
+        "key_id": "DEVKEY:AB12",
+        "purpose": "device",
+        "signature": "21dcb0dbd49a494e8321818b4896f869174a8dde0158511dca06f975cdbea90030f9a23c9fbe55a14329b9975974a7531d61556d5708c6dda840d2f5ea701d03",
+        "subject_key": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+      }
+    ],
+    "gid": "diprish",
+    "identity_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+    "level": "1",
+    "self_signing": {
+      "gid": "diprish",
+      "key_id": "SSK:0001",
+      "purpose": "self-signing",
+      "signature": "9d2d4a76d208bc4989d3c425fe24f3b268b6c135e76229de2c1f67b7a53969bcb173a2ad4d89dfcd0e960d9056690400f6809defb2d025be4ad918530b2ca00e",
+      "subject_key": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+    }
+  }
+}

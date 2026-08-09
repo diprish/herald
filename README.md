@@ -29,6 +29,8 @@ spec/               Protocol specifications (v1.1 is current)
 docs/               Architecture notes, diagrams, and comparisons
 docs/architecture/  Tech stack decision and phased implementation roadmap
 docs/proposals/     Pre-HIP drafts (Offers; Cold Contact; Reservations)
+crates/herald-core  Shared protocol core (Rust; also builds to WebAssembly)
+vectors/            Published protocol test vectors
 ```
 
 ## Specification versions
@@ -37,6 +39,23 @@ docs/proposals/     Pre-HIP drafts (Offers; Cold Contact; Reservations)
 |---|---|---|
 | [v1.1](spec/HERALD_Protocol_Specification_v1.1.md) | **Current draft** | Event-log threads, HCS/HFA API split, sliding sync, OIDC auth, cross-signing, progressive identity levels, implicit trust grants, day-one bidirectional SMTP bridge, Bridge API, governance model |
 | [v1.0](spec/HERALD_Protocol_Specification_v1.0.md) | Superseded | Original envelope-based design |
+
+## Reference implementation
+
+[`crates/herald-core`](crates/herald-core) is the shared protocol core that every
+other component consumes — the home server natively, the web client through
+WebAssembly, mobile clients through UniFFI. It implements canonical
+serialization, event signing and verification, cross-signing chains, thread-log
+integrity, and trust-chain evaluation, with no I/O and no operating-system
+randomness.
+
+```sh
+cargo test -p herald-core
+```
+
+[`vectors/`](vectors) holds the published protocol test vectors — canonical
+forms, cross-signing chains, signed events, and trust decisions — which are the
+contract an independent implementation builds against.
 
 ## Planned components
 

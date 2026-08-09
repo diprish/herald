@@ -1,0 +1,130 @@
+{
+  "description": "Canonical JSON (JCS / RFC 8785 profile) as used for every HERALD signature.",
+  "note": "Floating-point numbers are rejected outright; see `rejected` for inputs an implementation must refuse rather than canonicalize.",
+  "rejected": [
+    {
+      "input": {
+        "k": 1.5
+      },
+      "name": "float",
+      "reason": "floating-point not permitted"
+    },
+    {
+      "input": {
+        "k": 10000000000.0
+      },
+      "name": "exponent",
+      "reason": "floating-point not permitted"
+    }
+  ],
+  "vectors": [
+    {
+      "canonical": "{}",
+      "input": {},
+      "name": "empty object",
+      "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+    },
+    {
+      "canonical": "[]",
+      "input": [],
+      "name": "empty array",
+      "sha512": "b25b294cb4deb69ea00a4c3cf3113904801b6015e5956bd019a8570b1fe1d6040e944ef3cdee16d0a46503ca6e659a25f21cf9ceddc13f352a3c98138c15d6af"
+    },
+    {
+      "canonical": "{\"C\":3,\"_\":4,\"a\":2,\"b\":1}",
+      "input": {
+        "C": 3,
+        "_": 4,
+        "a": 2,
+        "b": 1
+      },
+      "name": "key ordering",
+      "sha512": "54dfa20ae8c40157f13dfd06e216afeacf420d48b54f0ef44df60ce7fb8b9dd6bd46599b99d928d2f58c5651c9d62fe851ad7e20f633daa41c20d54d55cf479f"
+    },
+    {
+      "canonical": "{\"a\":[{\"c\":2,\"d\":1}],\"z\":{\"x\":2,\"y\":1}}",
+      "input": {
+        "a": [
+          {
+            "c": 2,
+            "d": 1
+          }
+        ],
+        "z": {
+          "x": 2,
+          "y": 1
+        }
+      },
+      "name": "nested ordering",
+      "sha512": "168fb8bbf1643fa77e20d1b7f798d07bc10eed76380ab47ad214000b59231646c582df54d38de6efe8de035d3001eb2a3e0887a21002cee990a96a5d8edbb38b"
+    },
+    {
+      "canonical": "[3,1,2]",
+      "input": [
+        3,
+        1,
+        2
+      ],
+      "name": "array order preserved",
+      "sha512": "bcc5a63c0b2e9468f6f6109e0f681fc3f7fc058f0effd694414a205750c3eda53b99e52040e902314e3547601286fac02ad5eda28e6ed763f086a9bd632d370e"
+    },
+    {
+      "canonical": "{\"max\":18446744073709551615,\"min\":-9223372036854775808}",
+      "input": {
+        "max": 18446744073709551615,
+        "min": -9223372036854775808
+      },
+      "name": "integer bounds",
+      "sha512": "d48786a8bc8a6c2f35649b47a7236b70227c94c98b8d9c5237533c9095feb7919dd43d781805752d78ae30709a0b458e6a00ff44fd7792126f449870bf6af55e"
+    },
+    {
+      "canonical": "{\"f\":false,\"n\":null,\"t\":true}",
+      "input": {
+        "f": false,
+        "n": null,
+        "t": true
+      },
+      "name": "literals",
+      "sha512": "f6b036afe184065763508bfdae00c9dd0093cee478ff701876b042e7843e0d6a9c4732f95c4ad14437310b40bce5f67e753f28d9b292e6e7eb951bab3b44efba"
+    },
+    {
+      "canonical": "{\"k\":\"quote:\\\" backslash:\\\\ newline:\\n tab:\\t control:\\u0001\"}",
+      "input": {
+        "k": "quote:\" backslash:\\ newline:\n tab:\t control:\u0001"
+      },
+      "name": "string escapes",
+      "sha512": "900e61a5db52b89e957b4c1a71e3bb98975e240ac5046d86f2716793ca6633382e5d05bd110c093aa2108eff06a5fd784caf772d15a356d3bee99d2462df91ee"
+    },
+    {
+      "canonical": "{\"emoji\":\"🛰\",\"greeting\":\"héllo wörld\"}",
+      "input": {
+        "emoji": "🛰",
+        "greeting": "héllo wörld"
+      },
+      "name": "non-ascii is literal",
+      "sha512": "852b916547de3a23711004da5de2b576c71fe628d5120bf5d5da4556486c626cefefee62f26105cb3c8c222f7ca9afccc84835d2d7ac772240865783ae94dbb1"
+    },
+    {
+      "canonical": "{\"a\":\"ascii\",\"𐀀\":\"astral\",\"Ｚ\":\"fullwidth\"}",
+      "input": {
+        "a": "ascii",
+        "Ｚ": "fullwidth",
+        "𐀀": "astral"
+      },
+      "name": "utf16 key ordering",
+      "sha512": "b4745d1b6b25655f51b7f77533b7020b600a98d54afb01c8a55d998677fe6e04c86dc3a6918f359f71e04560139d170561d6a4dc03519c180860845c2f4dddd3"
+    },
+    {
+      "canonical": "{\"format\":\"text/herald\",\"mentions\":[\"boss:deloitte\"],\"text\":\"Hi, please find the Q3 numbers attached.\"}",
+      "input": {
+        "format": "text/herald",
+        "mentions": [
+          "boss:deloitte"
+        ],
+        "text": "Hi, please find the Q3 numbers attached."
+      },
+      "name": "realistic event content",
+      "sha512": "1ff3366cc1e9a4e6e40f186604d1772b2702aeb24c48a607078058b169592c52267e8c8639892483baff0b5d1e6a4fe9623cf34d4bccd03c0c6bb7255193cc2c"
+    }
+  ]
+}
