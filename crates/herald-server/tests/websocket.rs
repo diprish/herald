@@ -9,9 +9,10 @@ use herald_core::crypto::PrivateKey;
 use herald_core::event::{EventDraft, EventType};
 use herald_core::id::{ContextAddress, Gid};
 use herald_core::identity::{IdentityBundle, KeyCertificate, KeyPurpose, VerificationLevel};
+use herald_server::store::Store;
 use herald_server::{
-    router, AppState, ClientFrame, Hhs, ListRequest, MemoryStore, ServerFrame, Subscription,
-    SyncRequest,
+    router, AppState, ClientFrame, Hhs, ListRequest, MemoryStore, ServerFrame, SqliteStore,
+    Subscription, SyncRequest,
 };
 use serde_json::json;
 use tokio::net::TcpStream;
@@ -63,13 +64,22 @@ fn person(name: &str, seed: u8) -> Person {
 
 /// Starts a server on an ephemeral port and returns its WebSocket URL.
 async fn serve(dev_auth: bool) -> String {
-    let state = AppState::new(Hhs::new(MemoryStore::new(), SERVER), dev_auth);
+    serve_with(MemoryStore::new(), dev_auth).await.0
+}
+
+/// Starts a server backed by `store`, returning its URL and a handle so the
+/// caller can stop it.
+async fn serve_with<S: Store + Send + 'static>(
+    store: S,
+    dev_auth: bool,
+) -> (String, tokio::task::JoinHandle<()>) {
+    let state = AppState::new(Hhs::new(store, SERVER), dev_auth);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         axum::serve(listener, router(state)).await.unwrap();
     });
-    format!("ws://{addr}/hcs/v1/ws")
+    (format!("ws://{addr}/hcs/v1/ws"), handle)
 }
 
 async fn send(socket: &mut Socket, frame: &ClientFrame) {
@@ -437,5 +447,94 @@ async fn pushes_do_not_leak_to_non_members() {
             assert!(response.threads.is_empty());
         }
         other => panic!("expected only her own sync, got {other:?}"),
+    }
+}
+
+/// A conversation held over a socket against a file-backed server is still
+/// there after that server is stopped and a new one starts on the same file.
+#[tokio::test]
+async fn state_survives_a_server_restart() {
+    let file = tempfile::NamedTempFile::new().unwrap();
+    let diprish = person("diprish", 1);
+    let alice = person("alice", 10);
+
+    let thread = {
+        let (url, server) = serve_with(SqliteStore::open(file.path()).unwrap(), true).await;
+        let mut d = connect(&url, "diprish").await;
+        let mut a = connect(&url, "alice").await;
+
+        for (socket, who) in [(&mut d, &diprish), (&mut a, &alice)] {
+            send(
+                socket,
+                &ClientFrame::Register {
+                    id: 1,
+                    bundle: Box::new(who.bundle.clone()),
+                },
+            )
+            .await;
+            expect_ack(socket, 1).await;
+        }
+
+        send(
+            &mut a,
+            &ClientFrame::AddContact {
+                id: 2,
+                contact: "diprish".into(),
+            },
+        )
+        .await;
+        expect_ack(&mut a, 2).await;
+
+        send(
+            &mut d,
+            &ClientFrame::CreateThread {
+                id: 3,
+                invitees: vec!["alice".into()],
+            },
+        )
+        .await;
+        let thread = match recv(&mut d).await {
+            ServerFrame::Thread { thread_id, .. } => thread_id,
+            other => panic!("expected thread, got {other:?}"),
+        };
+
+        post(&mut d, &diprish, &thread, "written to disk", 10).await;
+        server.abort();
+        thread
+    };
+
+    // A brand-new server process, same database file.
+    let (url, _server) = serve_with(SqliteStore::open(file.path()).unwrap(), true).await;
+    let mut a = connect(&url, "alice").await;
+
+    send(
+        &mut a,
+        &ClientFrame::Sync {
+            id: 50,
+            request: Box::new(SyncRequest {
+                lists: vec![ListRequest {
+                    name: "inbox".into(),
+                    range: [0, 30],
+                }],
+                thread_subscriptions: BTreeMap::from([(
+                    thread.clone(),
+                    Subscription { timeline_limit: 50 },
+                )]),
+            }),
+        },
+    )
+    .await;
+
+    match recv(&mut a).await {
+        ServerFrame::Sync { response, .. } => {
+            assert_eq!(response.lists[0].count, 1, "thread lost across restart");
+            let events = &response.threads[&thread].events;
+            assert_eq!(events.len(), 1);
+            assert_eq!(events[0].draft.content["text"], "written to disk");
+            events[0]
+                .verify(&diprish.bundle)
+                .expect("signature survives a restart");
+        }
+        other => panic!("expected sync, got {other:?}"),
     }
 }

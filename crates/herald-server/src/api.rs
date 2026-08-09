@@ -35,7 +35,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
 use crate::engine::{Hhs, ServerError, SyncRequest, SyncResponse};
-use crate::store::{MemoryStore, Store};
+use crate::store::Store;
 
 /// Protocol versions this build speaks, newest last.
 pub const SUPPORTED_VERSIONS: &[&str] = &["1.1"];
@@ -175,22 +175,35 @@ struct Push {
     event: Event,
 }
 
-/// Shared server state.
-#[derive(Clone)]
-pub struct AppState {
-    hhs: Arc<Mutex<Hhs<MemoryStore>>>,
+/// Shared server state, generic over the storage backend so a deployment can
+/// pick one at runtime.
+pub struct AppState<S: Store> {
+    hhs: Arc<Mutex<Hhs<S>>>,
     events: broadcast::Sender<Push>,
     dev_auth: bool,
     next_connection: Arc<AtomicU64>,
 }
 
-impl AppState {
+// Derived Clone would demand `S: Clone`, which the store is not and need not
+// be: every field is shared, so cloning is a handful of refcount bumps.
+impl<S: Store> Clone for AppState<S> {
+    fn clone(&self) -> Self {
+        Self {
+            hhs: Arc::clone(&self.hhs),
+            events: self.events.clone(),
+            dev_auth: self.dev_auth,
+            next_connection: Arc::clone(&self.next_connection),
+        }
+    }
+}
+
+impl<S: Store> AppState<S> {
     /// Wraps an engine for serving.
     ///
     /// `dev_auth` enables the unauthenticated identity assertion described in
     /// the module note; it must never be set in a real deployment.
     #[must_use]
-    pub fn new(hhs: Hhs<MemoryStore>, dev_auth: bool) -> Self {
+    pub fn new(hhs: Hhs<S>, dev_auth: bool) -> Self {
         let (events, _) = broadcast::channel(PUSH_BUFFER);
         Self {
             hhs: Arc::new(Mutex::new(hhs)),
@@ -202,7 +215,7 @@ impl AppState {
 
     /// Locks the engine, recovering from a poisoned mutex: a panic in one
     /// connection must not take the whole server down with it.
-    fn engine(&self) -> MutexGuard<'_, Hhs<MemoryStore>> {
+    fn engine(&self) -> MutexGuard<'_, Hhs<S>> {
         self.hhs
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -214,21 +227,24 @@ impl AppState {
 }
 
 /// Builds the HCS router.
-pub fn router(state: AppState) -> Router {
+pub fn router<S: Store + Send + 'static>(state: AppState<S>) -> Router {
     Router::new()
         .route("/hcs/v1/version", get(version))
         .route("/hcs/v1/ws", get(upgrade))
         .with_state(state)
 }
 
-async fn version(State(state): State<AppState>) -> impl IntoResponse {
+async fn version<S: Store + Send + 'static>(State(state): State<AppState<S>>) -> impl IntoResponse {
     Json(ServerFrame::Hello {
         server_name: state.engine().server_name().to_owned(),
         supported_versions: SUPPORTED_VERSIONS.iter().map(|&v| v.to_owned()).collect(),
     })
 }
 
-async fn upgrade(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
+async fn upgrade<S: Store + Send + 'static>(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState<S>>,
+) -> impl IntoResponse {
     ws.on_upgrade(move |socket| connection(socket, state))
 }
 
@@ -280,7 +296,7 @@ fn encode(frame: &ServerFrame) -> Message {
     )
 }
 
-async fn connection(socket: WebSocket, state: AppState) {
+async fn connection<S: Store + Send>(socket: WebSocket, state: AppState<S>) {
     let connection_id = state.next_connection_id();
     let (mut sink, mut stream) = socket.split();
 
@@ -335,10 +351,10 @@ async fn connection(socket: WebSocket, state: AppState) {
     }
 }
 
-async fn handshake(
+async fn handshake<S: Store + Send>(
     sink: &mut futures_util::stream::SplitSink<WebSocket, Message>,
     stream: &mut futures_util::stream::SplitStream<WebSocket>,
-    state: &AppState,
+    state: &AppState<S>,
 ) -> Option<Gid> {
     while let Some(Ok(message)) = stream.next().await {
         let Message::Text(text) = message else {
@@ -404,7 +420,7 @@ async fn handshake(
     None
 }
 
-fn visible_to(state: &AppState, identity: &Gid, event: &Event) -> bool {
+fn visible_to<S: Store + Send>(state: &AppState<S>, identity: &Gid, event: &Event) -> bool {
     state
         .engine()
         .store()
@@ -414,7 +430,12 @@ fn visible_to(state: &AppState, identity: &Gid, event: &Event) -> bool {
         .is_some_and(|thread| thread.has_member(identity))
 }
 
-fn handle(frame: ClientFrame, identity: &Gid, connection_id: u64, state: &AppState) -> ServerFrame {
+fn handle<S: Store + Send>(
+    frame: ClientFrame,
+    identity: &Gid,
+    connection_id: u64,
+    state: &AppState<S>,
+) -> ServerFrame {
     match frame {
         // A second negotiation on an established connection is a client bug.
         ClientFrame::SelectVersion { .. } => error(

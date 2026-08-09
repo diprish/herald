@@ -106,12 +106,21 @@ the submitting one, so a user's second device stays current without the sender
 being echoed its own event. A `herald-server` binary serves it, and five
 integration tests drive a listening server over real sockets.
 
-*Remaining:* the SQLite `Store` implementation, and authentication.
-**Authentication is not implemented** — §8.1 specifies OIDC with DPoP-bound
-device keys, and until that exists a connection simply asserts an identity.
-Events stay signature-verified so nothing can be forged, but *reads* are
-unprotected, so the binary refuses to start without an explicit
-`--insecure-dev-auth` acknowledging it.
+*Landed since:* `SqliteStore`, a durable single-file backend with `SQLite`
+compiled in, so a deployment needs no system library (§11.3). Both backends are
+held to one behavioural contract by `tests/store_conformance.rs`, and the
+server binary picks between them at runtime with `--db`. Adding durability
+exposed a real bug — thread numbering lived in engine memory and would have
+been reissued after a restart — now fixed by moving the counter into the store
+(finding 4 in [`implementation-findings.md`](implementation-findings.md)).
+
+**Status: complete**, with one deliberate exception. **Authentication is not
+implemented** — §8.1 specifies OIDC with DPoP-bound device keys, and until that
+exists a connection simply asserts an identity. Events stay signature-verified
+so nothing can be forged, but *reads* are unprotected, so the binary refuses to
+start without an explicit `--insecure-dev-auth` acknowledging it. Authentication
+is tracked as Phase 3 work rather than a Phase 2 remnant, since it needs a real
+IdP rather than another module.
 
 *Surfaced:* a genuine specification tension between server-assigned sequencing
 and signature coverage, written up in
