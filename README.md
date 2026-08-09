@@ -27,7 +27,7 @@ SPF/DKIM/DMARC, PGP/S-MIME, and Matrix.
 ```
 spec/            Protocol specifications (v1.1 is current)
 docs/            Architecture notes, diagrams, and comparisons
-docs/proposals/  Pre-HIP drafts (e.g. Offers: marketing as expiring state)
+docs/proposals/  Pre-HIP drafts (Offers as expiring state; Cold Contact)
 ```
 
 ## Specification versions
