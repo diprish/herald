@@ -14,11 +14,19 @@ HERALD eliminates spam and phishing **by structural design, not filtering**: the
 - **No HTML.** Structured content blocks make visual phishing impossible.
 - **Zero-interaction default.** Any mechanism requiring a user decision must have a path where the decision is inferred from an action the user already took. Security must never cost the end user effort that email did not.
 
+## How it compares to SMTP
+
+HERALD replaces spam and phishing filtering with structural prevention, adds
+real-time encrypted transport, and charges the user zero extra effort for that
+security. See **[docs/comparison-with-smtp.md](docs/comparison-with-smtp.md)**
+for a full, section-referenced comparison against SMTP, IMAP/POP,
+SPF/DKIM/DMARC, PGP/S-MIME, and Matrix.
+
 ## Repository layout
 
 ```
 spec/    Protocol specifications (v1.1 is current)
-docs/    Architecture notes and diagrams
+docs/    Architecture notes, diagrams, and comparisons
 ```
 
 ## Specification versions
