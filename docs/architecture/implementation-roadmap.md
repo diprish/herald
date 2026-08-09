@@ -88,6 +88,25 @@ against a locally running server from a clean checkout.
 **Explicitly out:** federation, E2EE payload encryption (events are signed but
 plaintext this phase), OIDC (stub auth), offline queues.
 
+**Status:** in progress.
+
+*Landed:* the transport-independent engine (`Hhs`) doing registration with
+cross-signing verification, trust-gated thread creation, membership checks,
+signature verification, sequencing, log append, and sliding-sync reads; the
+`Store` trait with an in-memory implementation; `herald-cli` running a narrated
+two-identity conversation; and an eight-case round-trip integration suite
+covering the happy path, cold-contact refusal, non-member posting and probing,
+sequence conflict and retry, tampering, unsound identity chains, and group
+threads.
+
+*Remaining:* the axum HTTP/WebSocket shell over the engine (`HELLO` and version
+negotiation per §8.2 and Appendix B) and the SQLite `Store` implementation. The
+engine is deliberately transport-independent, so both are additive.
+
+*Surfaced:* a genuine specification tension between server-assigned sequencing
+and signature coverage, written up in
+[`implementation-findings.md`](implementation-findings.md).
+
 ---
 
 ## Phase 3 — Depth (ordered by need, not strictly sequenced)

@@ -1,0 +1,13 @@
+[package]
+name = "herald-cli"
+description = "Reference HERALD client and demo harness."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+herald-core = { path = "../herald-core" }
+herald-server = { path = "../herald-server" }
+serde_json = { workspace = true }

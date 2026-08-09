@@ -110,6 +110,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "herald-cli"
+version = "0.1.0"
+dependencies = [
+ "herald-core",
+ "herald-server",
+ "serde_json",
+]
+
+[[package]]
 name = "herald-core"
 version = "0.1.0"
 dependencies = [
@@ -118,6 +127,16 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "thiserror",
+]
+
+[[package]]
+name = "herald-server"
+version = "0.1.0"
+dependencies = [
+ "herald-core",
+ "serde",
+ "serde_json",
  "thiserror",
 ]
 

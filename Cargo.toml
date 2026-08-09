@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/herald-core"]
+members = ["crates/herald-core", "crates/herald-server", "crates/herald-cli"]
 
 [workspace.package]
 version = "0.1.0"
