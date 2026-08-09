@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  check:
+    name: Format, lint, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace --all-targets
+
+      - name: Doc tests
+        run: cargo test --workspace --doc
+
+  wasm:
+    name: WebAssembly build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust with wasm target
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      # herald-core must stay free of getrandom and other host-only
+      # dependencies so the web client can consume it through WebAssembly.
+      # This job fails the moment something host-only creeps in.
+      - name: Build core for wasm32-unknown-unknown
+        run: cargo build -p herald-core --target wasm32-unknown-unknown
+
+  vectors:
+    name: Published vectors are current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal
+
+      - uses: Swatinem/rust-cache@v2
+
+      # The vectors in vectors/ are the contract other implementations build
+      # against. Regenerating must be a no-op unless the wire format changed
+      # on purpose, in which case the regenerated files belong in the diff.
+      - name: Regenerate and diff
+        run: |
+          cargo run -p herald-core --example gen_vectors
+          git diff --exit-code vectors/ \
+            || (echo "::error::vectors/ is stale - run: cargo run -p herald-core --example gen_vectors" && exit 1)

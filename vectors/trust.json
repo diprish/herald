@@ -1,0 +1,444 @@
+{
+  "caps": {
+    "cases": [
+      [
+        "0",
+        1.0,
+        3650,
+        0
+      ],
+      [
+        "B",
+        1.0,
+        3650,
+        0
+      ],
+      [
+        "1",
+        0.1,
+        365,
+        5
+      ],
+      [
+        "1",
+        0.6,
+        365,
+        50
+      ],
+      [
+        "1",
+        0.95,
+        365,
+        50
+      ],
+      [
+        "1",
+        0.05,
+        365,
+        1
+      ],
+      [
+        "1",
+        1.0,
+        29,
+        5
+      ],
+      [
+        "2",
+        0.1,
+        365,
+        10
+      ],
+      [
+        "2",
+        0.6,
+        365,
+        100
+      ],
+      [
+        "2",
+        0.0,
+        365,
+        1
+      ],
+      [
+        "2",
+        1.0,
+        0,
+        10
+      ]
+    ],
+    "description": "Adaptive Connection Request caps (spec 6.5): [level, acceptance_rate, account_age_days, expected_cap]."
+  },
+  "description": "Trust-chain decisions (spec 6.3). Timestamps are Unix seconds.",
+  "vectors": [
+    {
+      "expected": {
+        "code": "TRUST_DENIED",
+        "decision": "reject"
+      },
+      "name": "cold delivery is denied",
+      "now": 1800000000,
+      "recipient": {
+        "accepted_requests": [],
+        "blocked": [],
+        "contacts": [],
+        "contexts": [],
+        "grant_thread_usage": {},
+        "trust_grants": []
+      },
+      "request": null,
+      "sender": {
+        "address": "alice",
+        "contexts": [],
+        "level": "1"
+      }
+    },
+    {
+      "expected": {
+        "decision": "admit",
+        "tier": "mutual-contact"
+      },
+      "name": "tier 1 mutual contact",
+      "now": 1800000000,
+      "recipient": {
+        "accepted_requests": [],
+        "blocked": [],
+        "contacts": [
+          "alice"
+        ],
+        "contexts": [],
+        "grant_thread_usage": {},
+        "trust_grants": []
+      },
+      "request": null,
+      "sender": {
+        "address": "alice:home",
+        "contexts": [],
+        "level": "1"
+      }
+    },
+    {
+      "expected": {
+        "decision": "admit",
+        "tier": "shared-context"
+      },
+      "name": "tier 2 shared organizational context",
+      "now": 1800000000,
+      "recipient": {
+        "accepted_requests": [],
+        "blocked": [],
+        "contacts": [],
+        "contexts": [
+          {
+            "authority": "deloitte",
+            "context": "deloitte",
+            "gid": "diprish",
+            "valid_until": 1800086400
+          }
+        ],
+        "grant_thread_usage": {},
+        "trust_grants": []
+      },
+      "request": null,
+      "sender": {
+        "address": "alice:deloitte",
+        "contexts": [
+          {
+            "authority": "deloitte",
+            "context": "deloitte",
+            "gid": "alice",
+            "valid_until": 1800086400
+          }
+        ],
+        "level": "1"
+      }
+    },
+    {
+      "expected": {
+        "code": "TRUST_DENIED",
+        "decision": "reject"
+      },
+      "name": "tier 2 requires the same authority",
+      "now": 1800000000,
+      "recipient": {
+        "accepted_requests": [],
+        "blocked": [],
+        "contacts": [],
+        "contexts": [
+          {
+            "authority": "deloitte",
+            "context": "deloitte",
+            "gid": "diprish",
+            "valid_until": 1800086400
+          }
+        ],
+        "grant_thread_usage": {},
+        "trust_grants": []
+      },
+      "request": null,
+      "sender": {
+        "address": "alice:deloitte",
+        "contexts": [
+          {
+            "authority": "impostor-ca",
+            "context": "deloitte",
+            "gid": "alice",
+            "valid_until": 1800086400
+          }
+        ],
+        "level": "1"
+      }
+    },
+    {
+      "expected": {
+        "decision": "admit",
+        "tier": "accepted-request"
+      },
+      "name": "tier 3 accepted connection request",
+      "now": 1800000000,
+      "recipient": {
+        "accepted_requests": [
+          "alice"
+        ],
+        "blocked": [],
+        "contacts": [],
+        "contexts": [],
+        "grant_thread_usage": {},
+        "trust_grants": []
+      },
+      "request": null,
+      "sender": {
+        "address": "alice",
+        "contexts": [],
+        "level": "1"
+      }
+    },
+    {
+      "expected": {
+        "decision": "admit",
+        "tier": {
+          "implicit-grant": "transactional"
+        }
+      },
+      "name": "tier 4 transactional grant",
+      "now": 1800000000,
+      "recipient": {
+        "accepted_requests": [],
+        "blocked": [],
+        "contacts": [],
+        "contexts": [],
+        "grant_thread_usage": {},
+        "trust_grants": [
+          {
+            "grant_type": "transactional",
+            "grantee": "receipts:acmeair",
+            "max_threads": 5,
+            "scope": "thread-initiate",
+            "valid_until": 1800086400
+          }
+        ]
+      },
+      "request": null,
+      "sender": {
+        "address": "receipts:acmeair",
+        "contexts": [],
+        "level": "1"
+      }
+    },
+    {
+      "expected": {
+        "code": "TRUST_DENIED",
+        "decision": "reject"
+      },
+      "name": "tier 4 grant exhausted by thread ceiling",
+      "now": 1800000000,
+      "recipient": {
+        "accepted_requests": [],
+        "blocked": [],
+        "contacts": [],
+        "contexts": [],
+        "grant_thread_usage": {
+          "receipts:acmeair": 5
+        },
+        "trust_grants": [
+          {
+            "grant_type": "transactional",
+            "grantee": "receipts:acmeair",
+            "max_threads": 5,
+            "scope": "thread-initiate",
+            "valid_until": 1800086400
+          }
+        ]
+      },
+      "request": null,
+      "sender": {
+        "address": "receipts:acmeair",
+        "contexts": [],
+        "level": "1"
+      }
+    },
+    {
+      "expected": {
+        "code": "TRUST_DENIED",
+        "decision": "reject"
+      },
+      "name": "block overrides every tier",
+      "now": 1800000000,
+      "recipient": {
+        "accepted_requests": [],
+        "blocked": [
+          "alice"
+        ],
+        "contacts": [
+          "alice"
+        ],
+        "contexts": [],
+        "grant_thread_usage": {},
+        "trust_grants": []
+      },
+      "request": null,
+      "sender": {
+        "address": "alice",
+        "contexts": [],
+        "level": "1"
+      }
+    },
+    {
+      "expected": {
+        "code": "CONTEXT_MOVED",
+        "decision": "reject"
+      },
+      "name": "revoked context within grace redirects",
+      "now": 1800000000,
+      "recipient": {
+        "accepted_requests": [],
+        "blocked": [],
+        "contacts": [
+          "alice"
+        ],
+        "contexts": [],
+        "grant_thread_usage": {},
+        "trust_grants": []
+      },
+      "request": null,
+      "sender": {
+        "address": "alice:deloitte",
+        "contexts": [
+          {
+            "authority": "deloitte",
+            "context": "deloitte",
+            "gid": "alice",
+            "revoked_at": 1799999990,
+            "valid_until": 1800086400
+          }
+        ],
+        "level": "1"
+      }
+    },
+    {
+      "expected": {
+        "decision": "quarantine"
+      },
+      "name": "connection request quarantines",
+      "now": 1800000000,
+      "recipient": {
+        "accepted_requests": [],
+        "blocked": [],
+        "contacts": [],
+        "contexts": [],
+        "grant_thread_usage": {},
+        "trust_grants": []
+      },
+      "request": {
+        "acceptance_rate": 0.5,
+        "account_age_days": 365,
+        "introduction": "Hello, we met at the conference last week in Lisbon.",
+        "sent_today": 0
+      },
+      "sender": {
+        "address": "alice",
+        "contexts": [],
+        "level": "1"
+      }
+    },
+    {
+      "expected": {
+        "code": "LEVEL_INSUFFICIENT",
+        "decision": "reject"
+      },
+      "name": "level 0 cannot send connection requests",
+      "now": 1800000000,
+      "recipient": {
+        "accepted_requests": [],
+        "blocked": [],
+        "contacts": [],
+        "contexts": [],
+        "grant_thread_usage": {},
+        "trust_grants": []
+      },
+      "request": {
+        "acceptance_rate": 0.5,
+        "account_age_days": 365,
+        "introduction": "Hello, we met at the conference last week in Lisbon.",
+        "sent_today": 0
+      },
+      "sender": {
+        "address": "alice",
+        "contexts": [],
+        "level": "0"
+      }
+    },
+    {
+      "expected": {
+        "decision": "admit",
+        "tier": "mutual-contact"
+      },
+      "name": "level 0 still reaches a mutual contact",
+      "now": 1800000000,
+      "recipient": {
+        "accepted_requests": [],
+        "blocked": [],
+        "contacts": [
+          "alice"
+        ],
+        "contexts": [],
+        "grant_thread_usage": {},
+        "trust_grants": []
+      },
+      "request": null,
+      "sender": {
+        "address": "alice",
+        "contexts": [],
+        "level": "0"
+      }
+    },
+    {
+      "expected": {
+        "code": "RATE_LIMITED",
+        "decision": "reject"
+      },
+      "name": "connection request over the adaptive cap",
+      "now": 1800000000,
+      "recipient": {
+        "accepted_requests": [],
+        "blocked": [],
+        "contacts": [],
+        "contexts": [],
+        "grant_thread_usage": {},
+        "trust_grants": []
+      },
+      "request": {
+        "acceptance_rate": 0.5,
+        "account_age_days": 365,
+        "introduction": "Hello, we met at the conference last week in Lisbon.",
+        "sent_today": 999
+      },
+      "sender": {
+        "address": "alice",
+        "contexts": [],
+        "level": "1"
+      }
+    }
+  ]
+}

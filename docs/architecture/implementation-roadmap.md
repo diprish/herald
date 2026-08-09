@@ -15,7 +15,7 @@ why; this document records *in what order* and *when a phase is done*.
 **Done when:** both documents are merged to `main`. Every later PR is
 reviewable against a stated plan instead of relitigating direction.
 
-**Status:** in progress (this PR).
+**Status:** complete.
 
 ---
 
@@ -27,8 +27,9 @@ via UniFFI on mobile.
 
 Deliverables:
 
-- **Workspace scaffold**: `crates/herald-core`, with `herald-server` and
-  `herald-cli` as empty placeholders establishing the shape.
+- **Workspace scaffold**: `crates/herald-core`. (`herald-server` and
+  `herald-cli` are created in Phase 2 rather than committed empty — the target
+  shape is recorded in [`tech-stack.md`](tech-stack.md) §6.)
 - **Types**: GID and context-address parsing/validation against the §3.1–3.3
   grammars; event envelope; core event types (§4.1).
 - **Canonical serialization** (JCS, RFC 8785 style) — the bit-identical-
@@ -52,6 +53,11 @@ Deliverables:
 library, and a second implementer could start from `vectors/` alone.
 
 **Explicitly out:** networking, storage, async — the crate stays pure.
+
+**Status:** complete. 87 tests pass (80 unit, 6 vector-conformance, 1 doc);
+clippy is clean under `-D warnings` with `clippy::pedantic` enabled; the crate
+builds for `wasm32-unknown-unknown`; and `vectors/` regenerates byte-identically,
+which CI enforces.
 
 ---
 
