@@ -25,9 +25,10 @@ SPF/DKIM/DMARC, PGP/S-MIME, and Matrix.
 ## Repository layout
 
 ```
-spec/            Protocol specifications (v1.1 is current)
-docs/            Architecture notes, diagrams, and comparisons
-docs/proposals/  Pre-HIP drafts (Offers; Cold Contact; Reservations)
+spec/               Protocol specifications (v1.1 is current)
+docs/               Architecture notes, diagrams, and comparisons
+docs/architecture/  Reference-implementation tech stack and build order
+docs/proposals/     Pre-HIP drafts (Offers; Cold Contact; Reservations)
 ```
 
 ## Specification versions
