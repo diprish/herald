@@ -88,10 +88,9 @@ pub fn validate_chain_from(
     };
     let thread_id = first.draft.thread_id.as_str();
 
-    let mut expected_seq = start_seq;
     let mut expected_link = preceding_event_id.map(str::to_owned);
 
-    for event in events {
+    for (expected_seq, event) in (start_seq..).zip(events) {
         if event.draft.thread_id != thread_id {
             return Err(LogError::ThreadMismatch {
                 seq: event.draft.seq,
@@ -113,7 +112,6 @@ pub fn validate_chain_from(
             });
         }
 
-        expected_seq += 1;
         expected_link = Some(event.event_id.clone());
     }
     Ok(())
