@@ -57,9 +57,20 @@ unit-testable.
 See a real conversation, with every event signed and verified:
 
 ```sh
-cargo run -p herald-cli   # narrated two-identity exchange
-cargo test --workspace    # 95 tests
+cargo run -p herald-cli   # narrated two-identity exchange, in process
+cargo test --workspace    # 101 tests
 ```
+
+Or run the server and talk to it over the Client-Server API (§7.1) — a
+persistent WebSocket with `HELLO` version negotiation and real-time push:
+
+```sh
+cargo run -p herald-server --bin herald-server -- --insecure-dev-auth
+```
+
+Authentication is not implemented yet (§8.1 specifies OIDC), which is why that
+flag is required: events are still signature-verified so nothing can be forged,
+but reads are unprotected. The server refuses to start without it.
 
 [`vectors/`](vectors) holds the published protocol test vectors — canonical
 forms, cross-signing chains, signed events, and trust decisions — which are the

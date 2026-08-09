@@ -18,9 +18,11 @@
 // individually documented; restating them per call site is noise, not information.
 #![allow(clippy::missing_errors_doc)]
 
+pub mod api;
 pub mod engine;
 pub mod store;
 
+pub use api::{router, AppState, ClientFrame, ServerFrame, SUPPORTED_VERSIONS};
 pub use engine::{
     Hhs, ListRequest, ListResponse, ServerError, Subscription, SyncRequest, SyncResponse, Timeline,
 };
