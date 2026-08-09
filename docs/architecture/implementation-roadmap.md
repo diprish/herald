@@ -88,6 +88,35 @@ against a locally running server from a clean checkout.
 **Explicitly out:** federation, E2EE payload encryption (events are signed but
 plaintext this phase), OIDC (stub auth), offline queues.
 
+**Status:** in progress.
+
+*Landed:* the transport-independent engine (`Hhs`) doing registration with
+cross-signing verification, trust-gated thread creation, membership checks,
+signature verification, sequencing, log append, and sliding-sync reads; the
+`Store` trait with an in-memory implementation; `herald-cli` running a narrated
+two-identity conversation; and an eight-case round-trip integration suite
+covering the happy path, cold-contact refusal, non-member posting and probing,
+sequence conflict and retry, tampering, unsound identity chains, and group
+threads.
+
+*Landed since:* the axum HTTP/WebSocket transport — `HELLO` on connect with
+version negotiation (§8.2, Appendix B), id-correlated request/response frames,
+and real-time server push (§8.3) that reaches every member's connections except
+the submitting one, so a user's second device stays current without the sender
+being echoed its own event. A `herald-server` binary serves it, and five
+integration tests drive a listening server over real sockets.
+
+*Remaining:* the SQLite `Store` implementation, and authentication.
+**Authentication is not implemented** — §8.1 specifies OIDC with DPoP-bound
+device keys, and until that exists a connection simply asserts an identity.
+Events stay signature-verified so nothing can be forged, but *reads* are
+unprotected, so the binary refuses to start without an explicit
+`--insecure-dev-auth` acknowledging it.
+
+*Surfaced:* a genuine specification tension between server-assigned sequencing
+and signature coverage, written up in
+[`implementation-findings.md`](implementation-findings.md).
+
 ---
 
 ## Phase 3 — Depth (ordered by need, not strictly sequenced)

@@ -29,7 +29,7 @@ spec/               Protocol specifications (v1.1 is current)
 docs/               Architecture notes, diagrams, and comparisons
 docs/architecture/  Tech stack decision and phased implementation roadmap
 docs/proposals/     Pre-HIP drafts (Offers; Cold Contact; Reservations)
-crates/herald-core  Shared protocol core (Rust; also builds to WebAssembly)
+crates/            Rust workspace: herald-core, herald-server, herald-cli
 vectors/            Published protocol test vectors
 ```
 
@@ -49,9 +49,28 @@ serialization, event signing and verification, cross-signing chains, thread-log
 integrity, and trust-chain evaluation, with no I/O and no operating-system
 randomness.
 
+[`crates/herald-server`](crates/herald-server) is the home server engine:
+registration, trust-gated thread creation, signature verification, sequencing,
+and sliding sync — transport-independent, so the protocol rules stay
+unit-testable.
+
+See a real conversation, with every event signed and verified:
+
 ```sh
-cargo test -p herald-core
+cargo run -p herald-cli   # narrated two-identity exchange, in process
+cargo test --workspace    # 101 tests
 ```
+
+Or run the server and talk to it over the Client-Server API (§7.1) — a
+persistent WebSocket with `HELLO` version negotiation and real-time push:
+
+```sh
+cargo run -p herald-server --bin herald-server -- --insecure-dev-auth
+```
+
+Authentication is not implemented yet (§8.1 specifies OIDC), which is why that
+flag is required: events are still signature-verified so nothing can be forged,
+but reads are unprotected. The server refuses to start without it.
 
 [`vectors/`](vectors) holds the published protocol test vectors — canonical
 forms, cross-signing chains, signed events, and trust decisions — which are the

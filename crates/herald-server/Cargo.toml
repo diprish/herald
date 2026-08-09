@@ -1,0 +1,20 @@
+[package]
+name = "herald-server"
+description = "HERALD Home Server: trust evaluation, thread sequencing, and the Client-Server API."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+herald-core = { path = "../herald-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+futures-util = { workspace = true }
+
+[dev-dependencies]
+tokio-tungstenite = { workspace = true }
