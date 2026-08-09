@@ -27,7 +27,7 @@ SPF/DKIM/DMARC, PGP/S-MIME, and Matrix.
 ```
 spec/               Protocol specifications (v1.1 is current)
 docs/               Architecture notes, diagrams, and comparisons
-docs/architecture/  Reference-implementation tech stack and build order
+docs/architecture/  Tech stack decision and phased implementation roadmap
 docs/proposals/     Pre-HIP drafts (Offers; Cold Contact; Reservations)
 ```
 
@@ -46,7 +46,7 @@ docs/proposals/     Pre-HIP drafts (Offers; Cold Contact; Reservations)
 
 ## Status
 
-Pre-implementation. The specification is a living draft; wire formats are subject to revision through the HIP (HERALD Improvement Proposal) process described in spec §16.
+Pre-implementation. The specification is a living draft; wire formats are subject to revision through the HIP (HERALD Improvement Proposal) process described in spec §16. The reference implementation's stack and phased plan are documented in [docs/architecture/](docs/architecture/).
 
 ## License
 
