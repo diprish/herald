@@ -7,7 +7,8 @@
 use std::path::PathBuf;
 
 use herald_core::canonical::{canonical_hash, canonicalize};
-use herald_core::crypto::PrivateKey;
+use herald_core::crypto::{EncryptionPrivateKey, PrivateKey};
+use herald_core::encryption::{decrypt, encrypt, Aad, EncryptedContent, Entropy, RecipientDevice};
 use herald_core::event::{Event, EventDraft};
 use herald_core::identity::{IdentityBundle, VerificationLevel};
 use herald_core::trust::{
@@ -29,6 +30,12 @@ fn load(name: &str) -> Value {
 
 fn vectors(file: &Value) -> &Vec<Value> {
     file["vectors"].as_array().expect("vectors array")
+}
+
+/// Vectors publish a seed as the single byte it repeats; see `seed_encoding`.
+fn seed_from(value: &Value) -> [u8; 32] {
+    let byte = u8::try_from(value.as_u64().expect("seed byte")).expect("seed byte fits");
+    [byte; 32]
 }
 
 #[test]
@@ -110,7 +117,7 @@ fn event_vectors_match() {
 
     let bundle: IdentityBundle =
         serde_json::from_value(file["verification_bundle"].clone()).expect("bundle");
-    let device = PrivateKey::from_seed_hex(file["device_seed"].as_str().unwrap()).expect("seed");
+    let device = PrivateKey::from_seed(&seed_from(&file["device_seed_byte"]));
 
     for case in vectors(&file) {
         let name = case["name"].as_str().unwrap();
@@ -185,6 +192,73 @@ fn adaptive_cap_vectors_match() {
             daily_connection_request_cap(level, rate, age),
             expected,
             "cap changed for {level:?} at {rate} over {age} days"
+        );
+    }
+}
+
+#[test]
+fn encryption_vectors_match() {
+    let file = load("encryption.json");
+    assert!(!vectors(&file).is_empty());
+
+    let seeds = file["device_seed_bytes"]
+        .as_object()
+        .expect("device seed bytes");
+
+    for case in vectors(&file) {
+        let name = case["name"].as_str().unwrap();
+        let aad = Aad {
+            thread_id: case["aad"]["thread_id"].as_str().unwrap(),
+            sender: case["aad"]["sender"].as_str().unwrap(),
+        };
+        let plaintext = case["plaintext"].clone();
+        let envelope: EncryptedContent = serde_json::from_value(case["envelope"].clone())
+            .unwrap_or_else(|e| panic!("{name}: cannot parse envelope: {e}"));
+
+        // The sealed bytes must not be readable in the envelope itself.
+        let rendered = serde_json::to_string(&envelope).unwrap();
+        if let Some(text) = plaintext.get("text").and_then(Value::as_str) {
+            assert!(
+                !rendered.contains(text),
+                "{name}: plaintext leaked into envelope"
+            );
+        }
+
+        // Every listed recipient device opens it, and gets exactly what was sealed.
+        let recipients = case["recipients"].as_array().unwrap();
+        for recipient in recipients {
+            let owner = herald_core::id::Gid::parse(recipient["gid"].as_str().unwrap()).unwrap();
+            let device_key_id = recipient["device_key_id"].as_str().unwrap();
+            let address = format!("{owner}/{device_key_id}");
+            let secret = EncryptionPrivateKey::from_seed(&seed_from(&seeds[&address]));
+
+            assert_eq!(
+                decrypt(&envelope, aad, &owner, device_key_id, &secret)
+                    .unwrap_or_else(|e| panic!("{name}: {address} could not decrypt: {e}")),
+                plaintext,
+                "{name}: {address} decrypted to the wrong thing"
+            );
+        }
+
+        // Re-sealing with the recorded entropy must reproduce the envelope byte
+        // for byte: this is what pins the scheme for another implementation.
+        let devices: Vec<RecipientDevice> = recipients
+            .iter()
+            .map(|recipient| RecipientDevice {
+                gid: herald_core::id::Gid::parse(recipient["gid"].as_str().unwrap()).unwrap(),
+                device_key_id: recipient["device_key_id"].as_str().unwrap().to_owned(),
+                encryption_key: herald_core::crypto::EncryptionPublicKey::from_hex(
+                    recipient["encryption_key"].as_str().unwrap(),
+                )
+                .unwrap(),
+            })
+            .collect();
+        let entropy = seed_from(&case["entropy_byte"]);
+
+        assert_eq!(
+            encrypt(&plaintext, aad, &devices, &Entropy::from_bytes(entropy)).unwrap(),
+            envelope,
+            "{name}: re-encrypting produced a different envelope"
         );
     }
 }

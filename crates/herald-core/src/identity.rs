@@ -9,7 +9,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::canonical::{canonicalize_to_string, CanonicalError};
-use crate::crypto::{CryptoError, PrivateKey, PublicKey, Signature};
+use crate::crypto::{CryptoError, EncryptionPublicKey, PrivateKey, PublicKey, Signature};
+use crate::encryption::RecipientDevice;
 use crate::id::Gid;
 
 /// A GID's verification level (§3.4).
@@ -81,6 +82,19 @@ pub enum IdentityError {
         /// The certified key's identifier.
         key_id: String,
     },
+    /// A device certificate carried no encryption key, so nothing could be
+    /// encrypted to that device.
+    #[error("device certificate {key_id} has no encryption key")]
+    MissingEncryptionKey {
+        /// The device missing a key.
+        key_id: String,
+    },
+    /// A non-device certificate carried an encryption key.
+    #[error("certificate {key_id} carries an encryption key but is not a device")]
+    UnexpectedEncryptionKey {
+        /// The offending certificate.
+        key_id: String,
+    },
     /// Two device certificates claimed the same key id.
     #[error("duplicate device key id {key_id}")]
     DuplicateDevice {
@@ -103,6 +117,8 @@ struct CertificateBody {
     key_id: String,
     purpose: KeyPurpose,
     subject_key: PublicKey,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    encryption_key: Option<EncryptionPublicKey>,
 }
 
 /// A key certified by another key in the cross-signing chain (§3.6).
@@ -114,8 +130,16 @@ pub struct KeyCertificate {
     pub key_id: String,
     /// What the certified key is used for.
     pub purpose: KeyPurpose,
-    /// The certified key.
+    /// The certified Ed25519 key.
     pub subject_key: PublicKey,
+    /// The device's X25519 encryption key (§9).
+    ///
+    /// Required on device certificates and absent everywhere else: certifying
+    /// both keys together is what lets a counterparty who trusts a device to
+    /// *sign* also know where to *encrypt* for it, with no extra verification
+    /// step (§3.6).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub encryption_key: Option<EncryptionPublicKey>,
     /// Signature by the issuing key over the certificate body.
     pub signature: Signature,
 }
@@ -129,12 +153,45 @@ impl KeyCertificate {
         purpose: KeyPurpose,
         subject_key: PublicKey,
     ) -> Result<Self, IdentityError> {
+        Self::issue_with_encryption(issuer, gid, key_id, purpose, subject_key, None)
+    }
+
+    /// Issues a device certificate that also publishes an encryption key (§9).
+    ///
+    /// # Errors
+    /// Propagates canonicalization failures.
+    pub fn issue_device(
+        issuer: &PrivateKey,
+        gid: Gid,
+        key_id: impl Into<String>,
+        subject_key: PublicKey,
+        encryption_key: EncryptionPublicKey,
+    ) -> Result<Self, IdentityError> {
+        Self::issue_with_encryption(
+            issuer,
+            gid,
+            key_id,
+            KeyPurpose::Device,
+            subject_key,
+            Some(encryption_key),
+        )
+    }
+
+    fn issue_with_encryption(
+        issuer: &PrivateKey,
+        gid: Gid,
+        key_id: impl Into<String>,
+        purpose: KeyPurpose,
+        subject_key: PublicKey,
+        encryption_key: Option<EncryptionPublicKey>,
+    ) -> Result<Self, IdentityError> {
         let key_id = key_id.into();
         let body = CertificateBody {
             gid: gid.clone(),
             key_id: key_id.clone(),
             purpose,
             subject_key,
+            encryption_key,
         };
         let signature = issuer.sign(canonicalize_to_string(&body)?.as_bytes());
         Ok(Self {
@@ -142,6 +199,7 @@ impl KeyCertificate {
             key_id,
             purpose,
             subject_key,
+            encryption_key,
             signature,
         })
     }
@@ -153,6 +211,7 @@ impl KeyCertificate {
             key_id: self.key_id.clone(),
             purpose: self.purpose,
             subject_key: self.subject_key,
+            encryption_key: self.encryption_key,
         };
         issuer
             .verify(canonicalize_to_string(&body)?.as_bytes(), &self.signature)
@@ -187,6 +246,11 @@ impl IdentityBundle {
                 key_id: self.self_signing.key_id.clone(),
             });
         }
+        if self.self_signing.encryption_key.is_some() {
+            return Err(IdentityError::UnexpectedEncryptionKey {
+                key_id: self.self_signing.key_id.clone(),
+            });
+        }
         self.check_gid(&self.self_signing)?;
         self.self_signing.verify(self.identity_key)?;
 
@@ -194,6 +258,11 @@ impl IdentityBundle {
         for device in &self.devices {
             if device.purpose != KeyPurpose::Device {
                 return Err(IdentityError::WrongPurpose {
+                    key_id: device.key_id.clone(),
+                });
+            }
+            if device.encryption_key.is_none() {
+                return Err(IdentityError::MissingEncryptionKey {
                     key_id: device.key_id.clone(),
                 });
             }
@@ -218,6 +287,33 @@ impl IdentityBundle {
             .iter()
             .find(|device| device.key_id == key_id)
             .map(|device| device.subject_key))
+    }
+
+    /// Every device that can receive encrypted content, after verifying the
+    /// chain (§9).
+    ///
+    /// This is the "fanned out through the cross-signing chain" step: a sender
+    /// asks a recipient's published bundle where to encrypt, and gets an answer
+    /// only if the chain is sound.
+    ///
+    /// # Errors
+    /// Returns an error if the cross-signing chain does not verify.
+    pub fn recipient_devices(&self) -> Result<Vec<RecipientDevice>, IdentityError> {
+        self.verify()?;
+        self.devices
+            .iter()
+            .map(|device| {
+                Ok(RecipientDevice {
+                    gid: self.gid.clone(),
+                    device_key_id: device.key_id.clone(),
+                    encryption_key: device.encryption_key.ok_or_else(|| {
+                        IdentityError::MissingEncryptionKey {
+                            key_id: device.key_id.clone(),
+                        }
+                    })?,
+                })
+            })
+            .collect()
     }
 
     fn check_gid(&self, certificate: &KeyCertificate) -> Result<(), IdentityError> {
@@ -247,6 +343,7 @@ mod tests {
         let identity = PrivateKey::from_seed(&[1; 32]);
         let self_signing = PrivateKey::from_seed(&[2; 32]);
         let device = PrivateKey::from_seed(&[3; 32]);
+        let device_encryption = crate::crypto::EncryptionPrivateKey::from_seed(&[4; 32]);
 
         let self_signing_cert = KeyCertificate::issue(
             &identity,
@@ -256,12 +353,12 @@ mod tests {
             self_signing.public_key(),
         )
         .unwrap();
-        let device_cert = KeyCertificate::issue(
+        let device_cert = KeyCertificate::issue_device(
             &self_signing,
             gid.clone(),
             "DEVKEY:AB12",
-            KeyPurpose::Device,
             device.public_key(),
+            device_encryption.public_key(),
         )
         .unwrap();
 
@@ -296,12 +393,12 @@ mod tests {
     fn rejects_device_signed_by_the_wrong_key() {
         let mut fixture = fixture();
         let impostor = PrivateKey::from_seed(&[9; 32]);
-        fixture.bundle.devices[0] = KeyCertificate::issue(
+        fixture.bundle.devices[0] = KeyCertificate::issue_device(
             &impostor,
             fixture.bundle.gid.clone(),
             "DEVKEY:AB12",
-            KeyPurpose::Device,
             impostor.public_key(),
+            crate::crypto::EncryptionPrivateKey::from_seed(&[11; 32]).public_key(),
         )
         .unwrap();
         assert!(matches!(
@@ -335,12 +432,12 @@ mod tests {
         let mut fixture = fixture();
         let other_gid = Gid::parse("mallory").unwrap();
         let self_signing = PrivateKey::from_seed(&[2; 32]);
-        fixture.bundle.devices[0] = KeyCertificate::issue(
+        fixture.bundle.devices[0] = KeyCertificate::issue_device(
             &self_signing,
             other_gid,
             "DEVKEY:AB12",
-            KeyPurpose::Device,
             PrivateKey::from_seed(&[3; 32]).public_key(),
+            crate::crypto::EncryptionPrivateKey::from_seed(&[4; 32]).public_key(),
         )
         .unwrap();
         assert!(matches!(

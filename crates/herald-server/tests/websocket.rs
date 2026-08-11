@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 
 use futures_util::{SinkExt, StreamExt};
-use herald_core::crypto::PrivateKey;
+use herald_core::crypto::{EncryptionPrivateKey, PrivateKey};
 use herald_core::event::{EventDraft, EventType};
 use herald_core::id::{ContextAddress, Gid};
 use herald_core::identity::{IdentityBundle, KeyCertificate, KeyPurpose, VerificationLevel};
@@ -34,6 +34,7 @@ fn person(name: &str, seed: u8) -> Person {
     let identity = PrivateKey::from_seed(&[seed; 32]);
     let self_signing = PrivateKey::from_seed(&[seed + 1; 32]);
     let device = PrivateKey::from_seed(&[seed + 2; 32]);
+    let device_encryption = EncryptionPrivateKey::from_seed(&[seed + 3; 32]);
 
     Person {
         address: ContextAddress::parse(name).unwrap(),
@@ -50,12 +51,12 @@ fn person(name: &str, seed: u8) -> Person {
                 self_signing.public_key(),
             )
             .unwrap(),
-            devices: vec![KeyCertificate::issue(
+            devices: vec![KeyCertificate::issue_device(
                 &self_signing,
                 gid.clone(),
                 "DEVKEY:0001",
-                KeyPurpose::Device,
                 device.public_key(),
+                device_encryption.public_key(),
             )
             .unwrap()],
         },

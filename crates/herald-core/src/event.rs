@@ -257,6 +257,7 @@ mod tests {
         let identity = PrivateKey::from_seed(&[1; 32]);
         let self_signing = PrivateKey::from_seed(&[2; 32]);
         let device = PrivateKey::from_seed(&[3; 32]);
+        let device_encryption = crate::crypto::EncryptionPrivateKey::from_seed(&[4; 32]);
 
         let bundle = IdentityBundle {
             gid: gid.clone(),
@@ -270,12 +271,12 @@ mod tests {
                 self_signing.public_key(),
             )
             .unwrap(),
-            devices: vec![KeyCertificate::issue(
+            devices: vec![KeyCertificate::issue_device(
                 &self_signing,
                 gid,
                 "DEVKEY:AB12",
-                KeyPurpose::Device,
                 device.public_key(),
+                device_encryption.public_key(),
             )
             .unwrap()],
         };

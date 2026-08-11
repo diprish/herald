@@ -5,7 +5,7 @@
 //! does. A durable backend additionally has to survive a restart, which the
 //! in-memory one cannot be asked about — those cases are at the end.
 
-use herald_core::crypto::PrivateKey;
+use herald_core::crypto::{EncryptionPrivateKey, PrivateKey};
 use herald_core::event::{Event, EventDraft, EventType};
 use herald_core::id::{ContextAddress, Gid};
 use herald_core::identity::{IdentityBundle, KeyCertificate, KeyPurpose, VerificationLevel};
@@ -26,6 +26,7 @@ fn bundle(name: &str, seed: u8) -> (IdentityBundle, PrivateKey) {
     let identity = PrivateKey::from_seed(&[seed; 32]);
     let self_signing = PrivateKey::from_seed(&[seed + 1; 32]);
     let device = PrivateKey::from_seed(&[seed + 2; 32]);
+    let device_encryption = EncryptionPrivateKey::from_seed(&[seed + 3; 32]);
 
     let bundle = IdentityBundle {
         gid: gid.clone(),
@@ -39,12 +40,12 @@ fn bundle(name: &str, seed: u8) -> (IdentityBundle, PrivateKey) {
             self_signing.public_key(),
         )
         .unwrap(),
-        devices: vec![KeyCertificate::issue(
+        devices: vec![KeyCertificate::issue_device(
             &self_signing,
             gid,
             "DEVKEY:0001",
-            KeyPurpose::Device,
             device.public_key(),
+            device_encryption.public_key(),
         )
         .unwrap()],
     };

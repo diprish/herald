@@ -58,7 +58,7 @@ See a real conversation, with every event signed and verified:
 
 ```sh
 cargo run -p herald-cli   # narrated two-identity exchange, in process
-cargo test --workspace    # 119 tests
+cargo test --workspace    # 137 tests
 ```
 
 Or run the server and talk to it over the Client-Server API (§7.1) — a

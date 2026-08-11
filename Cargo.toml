@@ -13,6 +13,12 @@ repository = "https://github.com/diprish/herald"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ed25519-dalek = { version = "2", default-features = false }
+# No `getrandom` on any of these: herald-core takes entropy as a parameter so it
+# stays buildable for wasm32-unknown-unknown without a JavaScript shim.
+x25519-dalek = { version = "2", default-features = false, features = ["alloc", "precomputed-tables", "zeroize", "static_secrets"] }
+aes-gcm = { version = "0.10", default-features = false, features = ["aes", "alloc"] }
+hkdf = { version = "0.12", default-features = false }
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 sha2 = { version = "0.10", default-features = false }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 thiserror = "2"

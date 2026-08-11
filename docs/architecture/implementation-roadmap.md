@@ -134,8 +134,16 @@ Candidate slices, each independently mergeable:
 
 - **Cross-signing flows end-to-end** (§3.6): add-device ceremony, chain
   validation against counterparties.
-- **E2EE payload encryption** (§9): X25519 + AES-256-GCM wiring through core
-  and server; server holds ciphertext only.
+- **E2EE payload encryption** (§9): **done.** `herald_core::encryption`
+  implements `x25519-hkdf-sha512-aes256gcm` — a fresh content key and ephemeral
+  X25519 pair per event for forward secrecy, the content key wrapped per
+  recipient device through the cross-signing chain, and the payload bound to its
+  thread and sender. Device encryption keys are certified alongside signing keys
+  (§3.6), so a sender asks a recipient's published bundle where to encrypt.
+  Entropy is a parameter rather than an OS call, which keeps the crate
+  WebAssembly-clean and lets the published vectors cover encryption. A server
+  test asserts the store holds ciphertext and the routing metadata only.
+  Findings 5 and 6 came out of it.
 - **Draft event types** (`h.offer`, `h.itinerary`, `h.action` — see
   [`../proposals/`](../proposals/)): mostly schemas plus validation rules once
   core exists, and implementing them is the cheapest way to pressure-test the

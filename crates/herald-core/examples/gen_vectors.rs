@@ -10,7 +10,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use herald_core::canonical::{canonical_hash, canonicalize};
-use herald_core::crypto::PrivateKey;
+use herald_core::crypto::{EncryptionPrivateKey, PrivateKey};
+use herald_core::encryption::{encrypt, Aad, Entropy, RecipientDevice};
 use herald_core::error::ErrorCode;
 use herald_core::event::{EventDraft, EventType};
 use herald_core::id::{ContextAddress, ContextName, Gid};
@@ -35,6 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     write(&root.join("identity.json"), identity_vectors()?)?;
     write(&root.join("events.json"), event_vectors()?)?;
     write(&root.join("trust.json"), trust_vectors()?)?;
+    write(&root.join("encryption.json"), encryption_vectors()?)?;
 
     println!("wrote vectors to {}", root.display());
     Ok(())
@@ -51,9 +53,14 @@ fn seed(byte: u8) -> [u8; 32] {
     [byte; 32]
 }
 
-fn seed_hex(byte: u8) -> String {
-    hex::encode(seed(byte))
-}
+/// How seeds are published.
+///
+/// Vectors name a seed by the single byte it repeats rather than by 64 hex
+/// characters. The material is identical, but a repeated-byte marker is not
+/// mistakable for real key material — by a reader or by a secret scanner —
+/// and a published reference implementation should not be teaching either one
+/// to expect key-shaped blobs in its fixtures.
+const SEED_ENCODING: &str = "each seed is the given byte repeated 32 times";
 
 fn canonical_vectors() -> Result<Value, Box<dyn std::error::Error>> {
     let cases = [
@@ -119,6 +126,7 @@ fn sample_bundle() -> Result<(IdentityBundle, PrivateKey), Box<dyn std::error::E
     let identity = PrivateKey::from_seed(&seed(1));
     let self_signing = PrivateKey::from_seed(&seed(2));
     let device = PrivateKey::from_seed(&seed(3));
+    let device_encryption = EncryptionPrivateKey::from_seed(&seed(4));
 
     let bundle = IdentityBundle {
         gid: gid.clone(),
@@ -131,12 +139,12 @@ fn sample_bundle() -> Result<(IdentityBundle, PrivateKey), Box<dyn std::error::E
             KeyPurpose::SelfSigning,
             self_signing.public_key(),
         )?,
-        devices: vec![KeyCertificate::issue(
+        devices: vec![KeyCertificate::issue_device(
             &self_signing,
             gid,
             "DEVKEY:AB12",
-            KeyPurpose::Device,
             device.public_key(),
+            device_encryption.public_key(),
         )?],
     };
     Ok((bundle, device))
@@ -148,31 +156,33 @@ fn identity_vectors() -> Result<Value, Box<dyn std::error::Error>> {
     // A device certificate signed by a key that is not the self-signing key.
     let mut forged_signer = bundle.clone();
     let impostor = PrivateKey::from_seed(&seed(9));
-    forged_signer.devices = vec![KeyCertificate::issue(
+    forged_signer.devices = vec![KeyCertificate::issue_device(
         &impostor,
         Gid::parse("diprish")?,
         "DEVKEY:AB12",
-        KeyPurpose::Device,
         impostor.public_key(),
+        EncryptionPrivateKey::from_seed(&seed(11)).public_key(),
     )?];
 
     // A genuine certificate lifted from another identity.
     let mut borrowed = bundle.clone();
-    borrowed.devices = vec![KeyCertificate::issue(
+    borrowed.devices = vec![KeyCertificate::issue_device(
         &PrivateKey::from_seed(&seed(2)),
         Gid::parse("mallory")?,
         "DEVKEY:AB12",
-        KeyPurpose::Device,
         PrivateKey::from_seed(&seed(3)).public_key(),
+        EncryptionPrivateKey::from_seed(&seed(4)).public_key(),
     )?];
 
     Ok(json!({
         "description": "Cross-signing chains: identity key -> self-signing key -> device key (spec 3.6).",
-        "seeds": {
-            "identity": seed_hex(1),
-            "self_signing": seed_hex(2),
-            "device": seed_hex(3),
-            "impostor": seed_hex(9)
+        "seed_encoding": SEED_ENCODING,
+        "seed_bytes": {
+            "identity": 1,
+            "self_signing": 2,
+            "device": 3,
+            "device_encryption": 4,
+            "impostor": 9
         },
         "vectors": [
             {
@@ -280,7 +290,8 @@ fn event_vectors() -> Result<Value, Box<dyn std::error::Error>> {
                         field except `event_id` and `signature`; `event_id` is SHA-512 of that same \
                         payload, truncated to 32 hex characters, prefixed with `$` and suffixed with \
                         `:<origin_server>`.",
-        "device_seed": seed_hex(3),
+        "seed_encoding": SEED_ENCODING,
+        "device_seed_byte": 3,
         "verification_bundle": bundle,
         "vectors": vectors
     }))
@@ -520,6 +531,95 @@ fn trust_vectors() -> Result<Value, Box<dyn std::error::Error>> {
                 ["2", 1.0, 0, 10]
             ]
         },
+        "vectors": vectors
+    }))
+}
+
+fn encryption_vectors() -> Result<Value, Box<dyn std::error::Error>> {
+    // Recipient device secrets are published here so an implementation can
+    // decrypt the vectors; they exist only for this file.
+    // All three call their device DEVKEY:0001: wrapped keys are addressed by
+    // gid/device_key_id, so identical device ids across identities are fine.
+    let devices = [("alice", 20u8), ("bob", 21u8), ("diprish", 22u8)];
+
+    let recipients: Vec<RecipientDevice> = devices
+        .iter()
+        .map(|(owner, seed_byte)| {
+            Ok(RecipientDevice {
+                gid: Gid::parse(owner)?,
+                device_key_id: "DEVKEY:0001".to_owned(),
+                encryption_key: EncryptionPrivateKey::from_seed(&seed(*seed_byte)).public_key(),
+            })
+        })
+        .collect::<Result<Vec<_>, Box<dyn std::error::Error>>>()?;
+
+    let cases: Vec<(&str, Value, Vec<RecipientDevice>, u8)> = vec![
+        (
+            "single recipient",
+            json!({ "format": "text/herald", "text": "Hi, please find the Q3 numbers attached." }),
+            vec![recipients[0].clone()],
+            30,
+        ),
+        (
+            "three recipient devices",
+            json!({ "format": "text/herald", "text": "standup at 10" }),
+            recipients.clone(),
+            31,
+        ),
+        (
+            "structured blocks",
+            json!({
+                "format": "text/herald",
+                "blocks": [
+                    { "kind": "paragraph", "text": "Q3 revenue" },
+                    { "kind": "table", "header": ["Region", "Revenue"], "rows": [["EMEA", "4.2M"]] }
+                ]
+            }),
+            vec![recipients[0].clone()],
+            32,
+        ),
+    ];
+
+    let aad = Aad {
+        thread_id: "!01J8X2M0AB:herald.deloitte.com",
+        sender: "diprish:deloitte",
+    };
+
+    let mut vectors = Vec::new();
+    for (name, plaintext, to, entropy_byte) in cases {
+        let envelope = encrypt(
+            &plaintext,
+            aad,
+            &to,
+            &Entropy::from_bytes(seed(entropy_byte)),
+        )?;
+        vectors.push(json!({
+            "name": name,
+            "entropy_byte": entropy_byte,
+            "aad": { "thread_id": aad.thread_id, "sender": aad.sender },
+            "recipients": to
+                .iter()
+                .map(|device| json!({
+                    "gid": device.gid.as_str(),
+                    "device_key_id": device.device_key_id,
+                    "encryption_key": device.encryption_key.to_hex(),
+                }))
+                .collect::<Vec<_>>(),
+            "plaintext": plaintext,
+            "envelope": envelope,
+        }));
+    }
+
+    Ok(json!({
+        "description": "End-to-end encrypted content (spec 9). Encryption is deterministic given \
+                        the entropy, which is what allows it to be covered by vectors; a real host \
+                        MUST draw fresh entropy per event.",
+        "algorithm": herald_core::encryption::ALGORITHM,
+        "seed_encoding": SEED_ENCODING,
+        "device_seed_bytes": devices
+            .iter()
+            .map(|(owner, seed_byte)| (format!("{owner}/DEVKEY:0001"), u64::from(*seed_byte)))
+            .collect::<BTreeMap<String, u64>>(),
         "vectors": vectors
     }))
 }

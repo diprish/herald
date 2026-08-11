@@ -100,3 +100,48 @@ server picks identifiers — but it is worth recording as guidance: **any
 monotonic protocol state must be as durable as the objects it names.** The same
 argument applies to anything else a future implementation might keep in engine
 memory.
+
+---
+
+## 5. Device identifiers are only unique within an identity
+
+**Raised by:** Phase 3, implementing end-to-end encryption.
+
+An encrypted event wraps the content key once per recipient device, filed under
+that device's identifier. The first implementation keyed those wrapped keys by
+`device_key_id` alone — which is wrong, because nothing in §3.6 makes a device
+identifier globally unique. Two people whose clients both name the first device
+`DEVKEY:0001` collide: sealing for both writes one wrapped key over the other,
+and one of the two recipients silently cannot read the message.
+
+Wrapped keys are now addressed by `gid/device_key_id`, and that qualified
+address is bound into the HKDF derivation of the wrapping key, so a wrapped key
+also cannot be refiled under a different device.
+
+**Suggestion for the spec:** state explicitly that `device_key_id` is scoped to
+its GID, and that any structure addressing devices across identities must
+qualify it. The same care applies to the KDS device tree (§11.1) and to anything
+else that indexes devices globally.
+
+---
+
+## 6. §9 does not say what the content encryption is bound to
+
+**Raised by:** Phase 3, implementing end-to-end encryption.
+
+§9 specifies the primitives (X25519, AES-256-GCM, HKDF-SHA512) but not the
+associated data — what a sealed payload is cryptographically tied to. That
+choice has real consequences, and an unstated one means two implementations can
+differ while both looking compliant.
+
+This implementation binds `thread_id` and `sender`, so a server cannot move a
+sealed payload into another thread or reattribute it. It deliberately does not
+bind `seq`: under the optimistic-concurrency sequencing of finding 1, a send
+that loses a race is re-signed at a new position, and binding `seq` would force
+re-encryption for every recipient on each retry. Position is already covered by
+the event signature.
+
+**Suggestion:** the specification should fix the associated data explicitly, and
+the choice interacts with finding 1 — if sequencing moves to a server
+counter-signature, binding `seq` into the ciphertext becomes cheap and would be
+worth doing.

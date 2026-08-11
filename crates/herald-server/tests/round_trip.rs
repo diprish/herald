@@ -4,7 +4,7 @@
 //! This is the Phase 2 milestone from `docs/architecture/implementation-roadmap.md` —
 //! the first real HERALD conversation.
 
-use herald_core::crypto::PrivateKey;
+use herald_core::crypto::{EncryptionPrivateKey, PrivateKey};
 use herald_core::error::ErrorCode;
 use herald_core::event::{Event, EventDraft, EventType};
 use herald_core::id::{ContextAddress, Gid};
@@ -23,6 +23,7 @@ struct Person {
     gid: Gid,
     address: ContextAddress,
     device: PrivateKey,
+    device_encryption: EncryptionPrivateKey,
     bundle: IdentityBundle,
 }
 
@@ -32,6 +33,7 @@ fn person(name: &str, seed: u8) -> Person {
     let identity = PrivateKey::from_seed(&[seed; 32]);
     let self_signing = PrivateKey::from_seed(&[seed + 1; 32]);
     let device = PrivateKey::from_seed(&[seed + 2; 32]);
+    let device_encryption = EncryptionPrivateKey::from_seed(&[seed + 3; 32]);
 
     let bundle = IdentityBundle {
         gid: gid.clone(),
@@ -45,12 +47,12 @@ fn person(name: &str, seed: u8) -> Person {
             self_signing.public_key(),
         )
         .expect("self-signing certificate"),
-        devices: vec![KeyCertificate::issue(
+        devices: vec![KeyCertificate::issue_device(
             &self_signing,
             gid.clone(),
             "DEVKEY:0001",
-            KeyPurpose::Device,
             device.public_key(),
+            device_encryption.public_key(),
         )
         .expect("device certificate")],
     };
@@ -59,6 +61,7 @@ fn person(name: &str, seed: u8) -> Person {
         address: ContextAddress::parse(name).expect("valid address"),
         gid,
         device,
+        device_encryption,
         bundle,
     }
 }
@@ -442,4 +445,95 @@ fn one_untrusting_invitee_blocks_the_whole_thread() {
         .create_thread(&diprish.address, &[alice.gid.clone(), bob.gid.clone()], NOW)
         .unwrap_err();
     assert!(matches!(refused, ServerError::TrustDenied { .. }));
+}
+
+/// Specification §9: "servers relay and store ciphertext plus unencrypted
+/// routing/trust metadata only." This is that claim, checked against what the
+/// store actually holds.
+#[test]
+fn the_server_stores_ciphertext_and_never_the_plaintext() {
+    use herald_core::encryption::{decrypt, encrypt, Aad, Entropy};
+    use herald_server::store::Store;
+
+    const SECRET: &str = "the acquisition closes on Tuesday";
+
+    let diprish = person("diprish", 1);
+    let alice = person("alice", 10);
+
+    let mut hhs = Hhs::new(MemoryStore::new(), SERVER);
+    hhs.register(diprish.bundle.clone()).unwrap();
+    hhs.register(alice.bundle.clone()).unwrap();
+    hhs.add_contact(&alice.gid, &diprish.gid).unwrap();
+    let thread = hhs
+        .create_thread(&diprish.address, std::slice::from_ref(&alice.gid), NOW)
+        .unwrap();
+
+    // Seal for every device in both parties' published bundles: the recipient's
+    // devices, and the sender's own so their other devices can read it too.
+    let mut recipients = alice.bundle.recipient_devices().unwrap();
+    recipients.extend(diprish.bundle.recipient_devices().unwrap());
+
+    let sender = diprish.address.to_string();
+    let aad = Aad {
+        thread_id: &thread,
+        sender: &sender,
+    };
+    let sealed = encrypt(
+        &json!({ "format": "text/herald", "text": SECRET }),
+        aad,
+        &recipients,
+        &Entropy::from_bytes([77; 32]),
+    )
+    .unwrap();
+
+    let head = hhs.head(&thread).unwrap();
+    let event = EventDraft {
+        thread_id: thread.clone(),
+        seq: head.seq,
+        prev_event: head.prev_event,
+        event_type: EventType::Message,
+        sender: diprish.address.clone(),
+        origin_server: SERVER.into(),
+        created_at: "2026-08-09T10:00:00.000Z".into(),
+        content: serde_json::to_value(&sealed).unwrap(),
+        device_key_id: "DEVKEY:0001".into(),
+    }
+    .sign(&diprish.device)
+    .unwrap();
+
+    hhs.submit(event).unwrap();
+
+    // What the server holds: no plaintext anywhere in the stored event...
+    let stored = hhs.store().events(&thread, 1, 10).unwrap();
+    let raw = serde_json::to_string(&stored).unwrap();
+    assert!(!raw.contains(SECRET), "plaintext reached storage");
+
+    // ...but the routing and trust metadata it needs is still in the clear.
+    assert_eq!(stored[0].draft.sender, diprish.address);
+    assert_eq!(stored[0].draft.thread_id, thread);
+    assert_eq!(stored[0].draft.seq, 1);
+
+    // And the recipient can read it.
+    let envelope: herald_core::encryption::EncryptedContent =
+        serde_json::from_value(stored[0].draft.content.clone()).unwrap();
+    let opened = decrypt(
+        &envelope,
+        aad,
+        &alice.gid,
+        "DEVKEY:0001",
+        &alice.device_encryption,
+    )
+    .unwrap();
+    assert_eq!(opened["text"], SECRET);
+
+    // A third party who is somehow handed the event still cannot read it.
+    let mallory = person("mallory", 20);
+    assert!(decrypt(
+        &envelope,
+        aad,
+        &mallory.gid,
+        "DEVKEY:0001",
+        &mallory.device_encryption
+    )
+    .is_err());
 }
