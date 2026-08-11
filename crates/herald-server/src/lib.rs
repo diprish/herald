@@ -26,4 +26,6 @@ pub use api::{router, AppState, ClientFrame, ServerFrame, SUPPORTED_VERSIONS};
 pub use engine::{
     Hhs, ListRequest, ListResponse, ServerError, Subscription, SyncRequest, SyncResponse, Timeline,
 };
-pub use store::{Account, MemoryStore, Store, StoreError, Thread, ThreadHead, ThreadSummary};
+pub use store::{
+    Account, MemoryStore, SqliteStore, Store, StoreError, Thread, ThreadHead, ThreadSummary,
+};

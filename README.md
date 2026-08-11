@@ -58,15 +58,18 @@ See a real conversation, with every event signed and verified:
 
 ```sh
 cargo run -p herald-cli   # narrated two-identity exchange, in process
-cargo test --workspace    # 101 tests
+cargo test --workspace    # 119 tests
 ```
 
 Or run the server and talk to it over the Client-Server API (§7.1) — a
 persistent WebSocket with `HELLO` version negotiation and real-time push:
 
 ```sh
-cargo run -p herald-server --bin herald-server -- --insecure-dev-auth
+cargo run -p herald-server --bin herald-server -- --db herald.db --insecure-dev-auth
 ```
+
+State lives in a single SQLite file (`--db`), or in memory if you omit it.
+`SQLite` is compiled in, so there is no system library to install.
 
 Authentication is not implemented yet (§8.1 specifies OIDC), which is why that
 flag is required: events are still signature-verified so nothing can be forged,

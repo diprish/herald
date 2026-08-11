@@ -78,3 +78,25 @@ what happened.
 **Suggestion:** add a `SERVER_ERROR` code, explicitly carrying no information
 about the request, so servers are not forced to misreport internal failures as
 client-visible protocol states.
+
+---
+
+## 4. Thread identifiers must be allocated by the store, not the engine
+
+**Raised by:** Phase 2, adding `SqliteStore`.
+
+The engine originally held its thread counter in memory. Against the in-memory
+store that is indistinguishable from correct, because process lifetime and data
+lifetime coincide. Against a durable store it is a bug: a restarted server would
+begin numbering from the start again and mint thread identifiers that already
+exist in the database, silently colliding with live threads.
+
+The counter now lives behind `Store::allocate_thread_number`, so it is as
+durable as the data it names, and `tests/store_conformance.rs` asserts that a
+restart does not reissue an identifier.
+
+This is not a specification defect — §4.2 says nothing about how a sequencing
+server picks identifiers — but it is worth recording as guidance: **any
+monotonic protocol state must be as durable as the objects it names.** The same
+argument applies to anything else a future implementation might keep in engine
+memory.

@@ -160,7 +160,6 @@ pub struct SyncResponse {
 pub struct Hhs<S: Store> {
     store: S,
     server_name: String,
-    next_thread: u64,
 }
 
 impl<S: Store> Hhs<S> {
@@ -170,7 +169,6 @@ impl<S: Store> Hhs<S> {
         Self {
             store,
             server_name: server_name.into(),
-            next_thread: 1,
         }
     }
 
@@ -256,8 +254,10 @@ impl<S: Store> Hhs<S> {
             }
         }
 
-        let thread_id = format!("!{:010}:{}", self.next_thread, self.server_name);
-        self.next_thread += 1;
+        // The counter lives in the store, not here: a restart against a
+        // durable backend must not reissue identifiers that already exist.
+        let number = self.store.allocate_thread_number()?;
+        let thread_id = format!("!{number:010}:{}", self.server_name);
 
         let mut members = vec![creator.gid().clone()];
         for invitee in invitees {
