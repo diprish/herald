@@ -28,9 +28,10 @@ code in one place is the point of the crate. See
 | Module | Specification | Contents |
 |---|---|---|
 | `canonical` | §4.1, §9 | JCS/RFC 8785 canonical JSON and SHA-512 hashing. Floats are rejected outright, as in Matrix canonical JSON |
-| `crypto` | §9 | Ed25519 keys, signing, verification; hex wire encoding |
+| `crypto` | §9 | Ed25519 signing keys and X25519 encryption keys; hex wire encoding |
 | `id` | §3.1–3.3 | `Gid`, `ContextName`, `ContextAddress`, `HeraldAddress` grammars |
-| `identity` | §3.4, §3.6 | Verification levels and the identity → self-signing → device certificate chain |
+| `identity` | §3.4, §3.6 | Verification levels and the identity → self-signing → device certificate chain, certifying each device's signing *and* encryption key |
+| `encryption` | §9 | End-to-end encryption: fresh content key and ephemeral X25519 pair per event, wrapped per recipient device |
 | `event` | §4.1 | Event drafts, content-derived `event_id`, signing and verification |
 | `log` | §4.2 | Thread-log sequence and hash-chain validation, including sliding-sync windows |
 | `trust` | §6 | Tier 1–4 admission decisions, context-grant grace states, adaptive Connection Request caps |

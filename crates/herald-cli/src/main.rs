@@ -10,11 +10,12 @@
 
 use std::collections::BTreeMap;
 
-use herald_core::crypto::PrivateKey;
+use herald_core::crypto::{EncryptionPrivateKey, PrivateKey};
+use herald_core::encryption::{decrypt, encrypt, Aad, EncryptedContent, Entropy};
 use herald_core::event::{EventDraft, EventType};
 use herald_core::id::{ContextAddress, Gid};
 use herald_core::identity::{IdentityBundle, KeyCertificate, KeyPurpose, VerificationLevel};
-use herald_server::{Hhs, ListRequest, MemoryStore, ServerError, Subscription, SyncRequest};
+use herald_server::{Hhs, ListRequest, MemoryStore, Subscription, SyncRequest};
 use serde_json::json;
 
 const SERVER: &str = "herald.example.com";
@@ -24,6 +25,7 @@ struct Person {
     gid: Gid,
     address: ContextAddress,
     device: PrivateKey,
+    device_encryption: EncryptionPrivateKey,
     bundle: IdentityBundle,
 }
 
@@ -32,6 +34,7 @@ fn person(name: &str, seed: u8) -> Result<Person, Box<dyn std::error::Error>> {
     let identity = PrivateKey::from_seed(&[seed; 32]);
     let self_signing = PrivateKey::from_seed(&[seed + 1; 32]);
     let device = PrivateKey::from_seed(&[seed + 2; 32]);
+    let device_encryption = EncryptionPrivateKey::from_seed(&[seed + 3; 32]);
 
     let bundle = IdentityBundle {
         gid: gid.clone(),
@@ -44,12 +47,12 @@ fn person(name: &str, seed: u8) -> Result<Person, Box<dyn std::error::Error>> {
             KeyPurpose::SelfSigning,
             self_signing.public_key(),
         )?,
-        devices: vec![KeyCertificate::issue(
+        devices: vec![KeyCertificate::issue_device(
             &self_signing,
             gid.clone(),
             "DEVKEY:0001",
-            KeyPurpose::Device,
             device.public_key(),
+            device_encryption.public_key(),
         )?],
     };
 
@@ -57,17 +60,38 @@ fn person(name: &str, seed: u8) -> Result<Person, Box<dyn std::error::Error>> {
         address: ContextAddress::parse(name)?,
         gid,
         device,
+        device_encryption,
         bundle,
     })
 }
 
+/// Seals the message for every device in the thread's members, signs it, and
+/// submits. `entropy` stands in for a fresh draw from the host's RNG.
 fn send(
     hhs: &mut Hhs<MemoryStore>,
     from: &Person,
+    to: &[&Person],
     thread_id: &str,
     text: &str,
     at: &str,
-) -> Result<String, ServerError> {
+    entropy: u8,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let mut recipients = from.bundle.recipient_devices()?;
+    for person in to {
+        recipients.extend(person.bundle.recipient_devices()?);
+    }
+
+    let sender = from.address.to_string();
+    let sealed = encrypt(
+        &json!({ "format": "text/herald", "text": text }),
+        Aad {
+            thread_id,
+            sender: &sender,
+        },
+        &recipients,
+        &Entropy::from_bytes([entropy; 32]),
+    )?;
+
     let head = hhs.head(thread_id)?;
     let event = EventDraft {
         thread_id: thread_id.to_owned(),
@@ -77,7 +101,7 @@ fn send(
         sender: from.address.clone(),
         origin_server: SERVER.to_owned(),
         created_at: at.to_owned(),
-        content: json!({ "format": "text/herald", "text": text }),
+        content: serde_json::to_value(&sealed)?,
         device_key_id: "DEVKEY:0001".to_owned(),
     }
     .sign(&from.device)?;
@@ -123,25 +147,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let thread = hhs.create_thread(&diprish.address, std::slice::from_ref(&alice.gid), NOW)?;
     println!("    {thread}");
 
-    step(5, "Exchange messages");
-    for (who, text, at) in [
+    step(5, "Exchange messages, end-to-end encrypted");
+    for (who, other, text, at, entropy) in [
         (
             &diprish,
+            &alice,
             "Hello Alice - first message on HERALD.",
             "2026-08-09T10:00:00.000Z",
+            60u8,
         ),
         (
             &alice,
+            &diprish,
             "Hi Diprish. No spam filter involved.",
             "2026-08-09T10:01:00.000Z",
+            61,
         ),
         (
             &diprish,
+            &alice,
             "None needed - you admitted me first.",
             "2026-08-09T10:02:00.000Z",
+            62,
         ),
     ] {
-        let event_id = send(&mut hhs, who, &thread, text, at)?;
+        let event_id = send(&mut hhs, who, &[other], &thread, text, at, entropy)?;
         println!("    {:<10} -> {}", who.gid.as_str(), &event_id[..24]);
     }
 
@@ -162,10 +192,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sync.lists[0].count, sync.threads[&thread].from_seq
     );
 
-    step(
-        7,
-        "Alice verifies each event herself, not trusting the server",
+    step(7, "What the server holds is ciphertext (spec 9)");
+    let stored = &sync.threads[&thread].events[0];
+    let envelope: EncryptedContent = serde_json::from_value(stored.draft.content.clone())?;
+    println!("    algorithm    {}", envelope.algorithm);
+    println!("    sealed for   {} device(s)", envelope.recipients.len());
+    println!(
+        "    ciphertext   {}...",
+        &envelope.ciphertext[..envelope.ciphertext.len().min(40)]
     );
+    println!(
+        "    in the clear only: sender={} thread={}... seq={}",
+        stored.draft.sender,
+        &stored.draft.thread_id[..8],
+        stored.draft.seq
+    );
+
+    step(8, "Alice verifies and decrypts each event herself");
     for event in &sync.threads[&thread].events {
         let sender = if event.draft.sender.gid() == &diprish.gid {
             &diprish
@@ -173,28 +216,44 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &alice
         };
         event.verify(&sender.bundle)?;
+
+        let envelope: EncryptedContent = serde_json::from_value(event.draft.content.clone())?;
+        let opened = decrypt(
+            &envelope,
+            Aad {
+                thread_id: &thread,
+                sender: &event.draft.sender.to_string(),
+            },
+            &alice.gid,
+            "DEVKEY:0001",
+            &alice.device_encryption,
+        )?;
         println!(
-            "    seq {}  {:<10} verified  {}",
+            "    seq {}  {:<10} verified + decrypted  {}",
             event.draft.seq,
             event.draft.sender.to_string(),
-            event.draft.content["text"].as_str().unwrap_or_default()
+            opened["text"].as_str().unwrap_or_default()
         );
     }
 
-    step(8, "An outsider tries to post");
+    step(9, "An outsider tries to post");
     let mallory = person("mallory", 20)?;
     hhs.register(mallory.bundle.clone())?;
     match send(
         &mut hhs,
         &mallory,
+        &[],
         &thread,
         "let me in",
         "2026-08-09T10:03:00.000Z",
+        63,
     ) {
         Ok(_) => println!("    unexpectedly accepted"),
-        Err(error) => println!("    refused: {} - {error}", error.error_code()),
+        Err(error) => println!("    refused: {error}"),
     }
 
-    println!("\nDone. Cold sending never happened; every delivered event was signed and verified.");
+    println!();
+    println!("Done. Cold sending never happened, every delivered event was signed and");
+    println!("verified, and the server never held the plaintext.");
     Ok(())
 }

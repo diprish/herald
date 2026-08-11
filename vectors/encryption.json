@@ -1,0 +1,123 @@
+{
+  "algorithm": "x25519-hkdf-sha512-aes256gcm",
+  "description": "End-to-end encrypted content (spec 9). Encryption is deterministic given the entropy, which is what allows it to be covered by vectors; a real host MUST draw fresh entropy per event.",
+  "device_seed_bytes": {
+    "alice/DEVKEY:0001": 20,
+    "bob/DEVKEY:0001": 21,
+    "diprish/DEVKEY:0001": 22
+  },
+  "seed_encoding": "each seed is the given byte repeated 32 times",
+  "vectors": [
+    {
+      "aad": {
+        "sender": "diprish:deloitte",
+        "thread_id": "!01J8X2M0AB:herald.deloitte.com"
+      },
+      "entropy_byte": 30,
+      "envelope": {
+        "algorithm": "x25519-hkdf-sha512-aes256gcm",
+        "ciphertext": "D6iTFwCAutG1wwOQFsWyKUCfCuqR8J/OTDdL5cTemn9XtMZ2pa81126JMuLcN4ONzASZGLSGNexxRmvZxs7jU3fdmPEFPIB+TPdct2fc8qLs48B2jIUeRb/h",
+        "ephemeral_key": "bf4cd8d702f3602ada669dfa1697331752136c40c44f9b40d89f7ec747ba7c39",
+        "recipients": {
+          "alice/DEVKEY:0001": "kOslHQFkFabWGgr0JE/j7aaBvDr1ERorAn6dNlDkUMMEaRgdgzsUD1S44Jzop6Er"
+        }
+      },
+      "name": "single recipient",
+      "plaintext": {
+        "format": "text/herald",
+        "text": "Hi, please find the Q3 numbers attached."
+      },
+      "recipients": [
+        {
+          "device_key_id": "DEVKEY:0001",
+          "encryption_key": "18a6f8c1a7fddf22bd410138f79f7298cd38d1d0a542d4266d556be8609d8862",
+          "gid": "alice"
+        }
+      ]
+    },
+    {
+      "aad": {
+        "sender": "diprish:deloitte",
+        "thread_id": "!01J8X2M0AB:herald.deloitte.com"
+      },
+      "entropy_byte": 31,
+      "envelope": {
+        "algorithm": "x25519-hkdf-sha512-aes256gcm",
+        "ciphertext": "0us1DXpzazLvNGnbcsTm66gG99Nnqo1huD+s0oE8pbJZo1hwQZKgPkk82w8BrPByh2W0i00/SlxBfLNHD0Wr",
+        "ephemeral_key": "2a76d52fbe74f93dc2587375ffc799bda98a87fb1746a51918c7dc482b687456",
+        "recipients": {
+          "alice/DEVKEY:0001": "NyDZi+kiwXtdsCR/PeXWy8RJDBM0lnGrMWRwBvNeV/0bZB3CIzE65ez4QNObqpG4",
+          "bob/DEVKEY:0001": "rxO6NZd7lNYae5Z7KjZXsnL90gfeeBlQXY4CeHHEzbnNVsZVkYniSxOonmbi5lvM",
+          "diprish/DEVKEY:0001": "Fb2eJfSAmbJ3CLRL1PPy7z5b840ujuwaCP2bji/9bC6L2saVWaIVCEjvi+Ie/c9Z"
+        }
+      },
+      "name": "three recipient devices",
+      "plaintext": {
+        "format": "text/herald",
+        "text": "standup at 10"
+      },
+      "recipients": [
+        {
+          "device_key_id": "DEVKEY:0001",
+          "encryption_key": "18a6f8c1a7fddf22bd410138f79f7298cd38d1d0a542d4266d556be8609d8862",
+          "gid": "alice"
+        },
+        {
+          "device_key_id": "DEVKEY:0001",
+          "encryption_key": "bce059bf5b2ab7a91f3e863acf0c84d3ebbe04ca8490094b052b5b15afab1743",
+          "gid": "bob"
+        },
+        {
+          "device_key_id": "DEVKEY:0001",
+          "encryption_key": "7f442fb4ecc9dd6cde4635881fbe2bb433b67b004935c4330d21e36f681a0e12",
+          "gid": "diprish"
+        }
+      ]
+    },
+    {
+      "aad": {
+        "sender": "diprish:deloitte",
+        "thread_id": "!01J8X2M0AB:herald.deloitte.com"
+      },
+      "entropy_byte": 32,
+      "envelope": {
+        "algorithm": "x25519-hkdf-sha512-aes256gcm",
+        "ciphertext": "iz4QpX4p2faZ5BqMPoWvRed5IA9lwZK+SeSD+ACJYQZEJQRTk3SJiq5B7yKSlBotybTgcA0KFVD3oiaCbHeyAjgrCKTWXJCfhcsRyi6F7un1227HNJCckWZhTMdirDtzPRrk0iSiLzBAR3tG2U2eGtmdIwLt+oLJOf5fzuTd6m4xwU/so9PDzmgQbWgufWtyL8jeeHwxb9yhefnB2ZEP+josNz4=",
+        "ephemeral_key": "1179c3e2680bba42854e9285df0ce4dacdd20f721fcb6454a94150cd8ab13c54",
+        "recipients": {
+          "alice/DEVKEY:0001": "P1xkNxLJXpB+bDCFwcv+op5FOshIm0NmensfT6TedZBi212kewWX9dQE/hZAdSyX"
+        }
+      },
+      "name": "structured blocks",
+      "plaintext": {
+        "blocks": [
+          {
+            "kind": "paragraph",
+            "text": "Q3 revenue"
+          },
+          {
+            "header": [
+              "Region",
+              "Revenue"
+            ],
+            "kind": "table",
+            "rows": [
+              [
+                "EMEA",
+                "4.2M"
+              ]
+            ]
+          }
+        ],
+        "format": "text/herald"
+      },
+      "recipients": [
+        {
+          "device_key_id": "DEVKEY:0001",
+          "encryption_key": "18a6f8c1a7fddf22bd410138f79f7298cd38d1d0a542d4266d556be8609d8862",
+          "gid": "alice"
+        }
+      ]
+    }
+  ]
+}

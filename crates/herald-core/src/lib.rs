@@ -27,7 +27,8 @@
 //!
 //! ```
 //! use herald_core::{
-//!     crypto::PrivateKey,
+//!     crypto::{EncryptionPrivateKey, PrivateKey},
+//!     encryption::{decrypt, encrypt, Aad, Entropy},
 //!     event::{EventDraft, EventType},
 //!     id::{ContextAddress, Gid},
 //!     identity::{IdentityBundle, KeyCertificate, KeyPurpose, VerificationLevel},
@@ -37,6 +38,7 @@
 //! let identity = PrivateKey::from_seed(&[1; 32]);
 //! let self_signing = PrivateKey::from_seed(&[2; 32]);
 //! let device = PrivateKey::from_seed(&[3; 32]);
+//! let device_encryption = EncryptionPrivateKey::from_seed(&[4; 32]);
 //!
 //! // Publish a cross-signed key bundle: identity -> self-signing -> device.
 //! let bundle = IdentityBundle {
@@ -50,30 +52,46 @@
 //!         KeyPurpose::SelfSigning,
 //!         self_signing.public_key(),
 //!     )?,
-//!     devices: vec![KeyCertificate::issue(
+//!     devices: vec![KeyCertificate::issue_device(
 //!         &self_signing,
 //!         gid,
 //!         "DEVKEY:AB12",
-//!         KeyPurpose::Device,
 //!         device.public_key(),
+//!         device_encryption.public_key(),
 //!     )?],
 //! };
 //!
-//! // Sign an event with the device key and verify it against the bundle.
+//! // Seal the content for every device in the recipient's published bundle, so
+//! // the server relays ciphertext and only the recipients can read it.
+//! let thread_id = "!01J8X2M0AB:herald.deloitte.com";
+//! let sender = ContextAddress::parse("diprish:deloitte")?;
+//! let aad = Aad { thread_id, sender: &sender.to_string() };
+//! let sealed = encrypt(
+//!     &serde_json::json!({ "format": "text/herald", "text": "Hello" }),
+//!     aad,
+//!     &bundle.recipient_devices()?,
+//!     &Entropy::from_bytes([42; 32]),   // a host draws this fresh per event
+//! )?;
+//!
+//! // Sign an event carrying the sealed content, and verify it against the bundle.
 //! let event = EventDraft {
-//!     thread_id: "!01J8X2M0AB:herald.deloitte.com".into(),
+//!     thread_id: thread_id.into(),
 //!     seq: 1,
 //!     prev_event: None,
 //!     event_type: EventType::Message,
-//!     sender: ContextAddress::parse("diprish:deloitte")?,
+//!     sender: sender.clone(),
 //!     origin_server: "herald.deloitte.com".into(),
 //!     created_at: "2026-07-21T09:32:00.000Z".into(),
-//!     content: serde_json::json!({ "format": "text/herald", "text": "Hello" }),
+//!     content: serde_json::to_value(&sealed)?,
 //!     device_key_id: "DEVKEY:AB12".into(),
 //! }
 //! .sign(&device)?;
 //!
 //! event.verify(&bundle)?;
+//!
+//! // The recipient device opens it.
+//! let opened = decrypt(&sealed, aad, &Gid::parse("diprish")?, "DEVKEY:AB12", &device_encryption)?;
+//! assert_eq!(opened["text"], "Hello");
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
@@ -86,6 +104,7 @@
 
 pub mod canonical;
 pub mod crypto;
+pub mod encryption;
 pub mod error;
 pub mod event;
 pub mod id;
@@ -94,7 +113,12 @@ pub mod log;
 pub mod trust;
 
 pub use canonical::{canonical_hash, canonicalize, CanonicalError};
-pub use crypto::{CryptoError, PrivateKey, PublicKey, Signature};
+pub use crypto::{
+    CryptoError, EncryptionPrivateKey, EncryptionPublicKey, PrivateKey, PublicKey, Signature,
+};
+pub use encryption::{
+    decrypt, encrypt, EncryptedContent, EncryptionError, Entropy, RecipientDevice,
+};
 pub use error::ErrorCode;
 pub use event::{Event, EventDraft, EventError, EventType};
 pub use id::{ContextAddress, ContextName, Gid, HeraldAddress, IdError};

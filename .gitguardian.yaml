@@ -1,0 +1,21 @@
+version: 2
+
+secret:
+  ignored-paths:
+    # vectors/ is machine-generated protocol test data (see
+    # crates/herald-core/examples/gen_vectors.rs) and is the published contract
+    # other implementations build against. It necessarily contains 64-character
+    # hex strings, which a scanner cannot distinguish from key material:
+    #
+    #   * public keys - identity, self-signing, device, and ephemeral X25519
+    #     keys. These are public by definition and the vectors are useless
+    #     without them.
+    #   * SHA-512 digests of canonical forms.
+    #
+    # Private key material is deliberately NOT stored here in key-shaped form:
+    # every seed is published as the single byte it repeats (see the
+    # `seed_encoding` field in each file), so nothing in this directory is a
+    # secret, and nothing in it looks like one to a human either.
+    #
+    # Scanning stays on for the rest of the repository.
+    - "vectors/**"

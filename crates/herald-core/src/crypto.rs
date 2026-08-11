@@ -161,6 +161,107 @@ impl fmt::Display for Signature {
     }
 }
 
+/// An X25519 public key, used to receive encrypted content (§9).
+///
+/// Separate from the Ed25519 signing key on purpose: one key, one primitive.
+/// A device publishes both, and the cross-signing chain certifies them together
+/// (§3.6), so a counterparty that trusts a device to *sign* also knows where to
+/// *encrypt* for it.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct EncryptionPublicKey(x25519_dalek::PublicKey);
+
+impl EncryptionPublicKey {
+    /// Builds a key from its 32 raw bytes.
+    #[must_use]
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(x25519_dalek::PublicKey::from(bytes))
+    }
+
+    /// Decodes a key from lowercase hex.
+    pub fn from_hex(hex_str: &str) -> Result<Self, CryptoError> {
+        Ok(Self::from_bytes(decode_fixed::<32>(
+            hex_str,
+            "encryption key",
+        )?))
+    }
+
+    /// The key's raw bytes.
+    #[must_use]
+    pub fn to_bytes(self) -> [u8; 32] {
+        self.0.to_bytes()
+    }
+
+    /// The key as lowercase hex, which is its wire form.
+    #[must_use]
+    pub fn to_hex(self) -> String {
+        hex::encode(self.0.as_bytes())
+    }
+
+    pub(crate) fn inner(self) -> x25519_dalek::PublicKey {
+        self.0
+    }
+}
+
+impl fmt::Debug for EncryptionPublicKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EncryptionPublicKey({})", self.to_hex())
+    }
+}
+
+impl fmt::Display for EncryptionPublicKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.to_hex())
+    }
+}
+
+/// An X25519 private key.
+///
+/// Built from a caller-supplied seed for the same reason as [`PrivateKey`]:
+/// this crate never reaches for operating-system randomness.
+#[derive(Clone)]
+pub struct EncryptionPrivateKey(x25519_dalek::StaticSecret);
+
+impl EncryptionPrivateKey {
+    /// Builds a key from a 32-byte seed.
+    #[must_use]
+    pub fn from_seed(seed: &[u8; 32]) -> Self {
+        Self(x25519_dalek::StaticSecret::from(*seed))
+    }
+
+    /// Builds a key from a hex-encoded 32-byte seed.
+    pub fn from_seed_hex(hex_str: &str) -> Result<Self, CryptoError> {
+        Ok(Self::from_seed(&decode_fixed::<32>(
+            hex_str,
+            "encryption key",
+        )?))
+    }
+
+    /// The matching public key.
+    #[must_use]
+    pub fn public_key(&self) -> EncryptionPublicKey {
+        EncryptionPublicKey(x25519_dalek::PublicKey::from(&self.0))
+    }
+
+    /// Performs the X25519 exchange with `peer`, yielding a shared secret.
+    ///
+    /// The result must be run through a KDF before use as a key; see
+    /// [`crate::encryption`].
+    #[must_use]
+    pub fn diffie_hellman(&self, peer: EncryptionPublicKey) -> [u8; 32] {
+        self.0.diffie_hellman(&peer.inner()).to_bytes()
+    }
+}
+
+impl fmt::Debug for EncryptionPrivateKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "EncryptionPrivateKey(<redacted> for {})",
+            self.public_key()
+        )
+    }
+}
+
 fn decode_fixed<const N: usize>(hex_str: &str, kind: &'static str) -> Result<[u8; N], CryptoError> {
     let bytes = hex::decode(hex_str).map_err(|e| CryptoError::Malformed {
         kind,
@@ -179,6 +280,19 @@ impl Serialize for PublicKey {
 }
 
 impl<'de> Deserialize<'de> for PublicKey {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = String::deserialize(deserializer)?;
+        Self::from_hex(&raw).map_err(serde::de::Error::custom)
+    }
+}
+
+impl Serialize for EncryptionPublicKey {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_hex())
+    }
+}
+
+impl<'de> Deserialize<'de> for EncryptionPublicKey {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let raw = String::deserialize(deserializer)?;
         Self::from_hex(&raw).map_err(serde::de::Error::custom)
@@ -254,6 +368,42 @@ mod tests {
             PublicKey::from_hex("aabb"),
             Err(CryptoError::Malformed { .. })
         ));
+    }
+
+    #[test]
+    fn x25519_agreement_is_symmetric() {
+        let alice = EncryptionPrivateKey::from_seed(&[1; 32]);
+        let bob = EncryptionPrivateKey::from_seed(&[2; 32]);
+        assert_eq!(
+            alice.diffie_hellman(bob.public_key()),
+            bob.diffie_hellman(alice.public_key())
+        );
+    }
+
+    #[test]
+    fn x25519_agreement_differs_per_peer() {
+        let alice = EncryptionPrivateKey::from_seed(&[1; 32]);
+        let bob = EncryptionPrivateKey::from_seed(&[2; 32]);
+        let eve = EncryptionPrivateKey::from_seed(&[3; 32]);
+        assert_ne!(
+            alice.diffie_hellman(bob.public_key()),
+            alice.diffie_hellman(eve.public_key())
+        );
+    }
+
+    #[test]
+    fn encryption_keys_round_trip_through_hex() {
+        let public = EncryptionPrivateKey::from_seed(&[4; 32]).public_key();
+        assert_eq!(
+            EncryptionPublicKey::from_hex(&public.to_hex()).unwrap(),
+            public
+        );
+    }
+
+    #[test]
+    fn encryption_private_key_debug_is_redacted() {
+        let rendered = format!("{:?}", EncryptionPrivateKey::from_seed(&[5; 32]));
+        assert!(rendered.contains("redacted"), "{rendered}");
     }
 
     #[test]

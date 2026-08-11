@@ -1,20 +1,23 @@
 {
   "description": "Cross-signing chains: identity key -> self-signing key -> device key (spec 3.6).",
-  "seeds": {
-    "device": "0303030303030303030303030303030303030303030303030303030303030303",
-    "identity": "0101010101010101010101010101010101010101010101010101010101010101",
-    "impostor": "0909090909090909090909090909090909090909090909090909090909090909",
-    "self_signing": "0202020202020202020202020202020202020202020202020202020202020202"
+  "seed_bytes": {
+    "device": 3,
+    "device_encryption": 4,
+    "identity": 1,
+    "impostor": 9,
+    "self_signing": 2
   },
+  "seed_encoding": "each seed is the given byte repeated 32 times",
   "vectors": [
     {
       "bundle": {
         "devices": [
           {
+            "encryption_key": "ac01b2209e86354fb853237b5de0f4fab13c7fcbf433a61c019369617fecf10b",
             "gid": "diprish",
             "key_id": "DEVKEY:AB12",
             "purpose": "device",
-            "signature": "21dcb0dbd49a494e8321818b4896f869174a8dde0158511dca06f975cdbea90030f9a23c9fbe55a14329b9975974a7531d61556d5708c6dda840d2f5ea701d03",
+            "signature": "1ac00687bddeaddf395eec915ca9bd82bb359dafbd393a17118458c05285261cc542413aec936a8a839350513fcd5f75c3480a94050963957c483f6082b4ae02",
             "subject_key": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
           }
         ],
@@ -39,10 +42,11 @@
       "bundle": {
         "devices": [
           {
+            "encryption_key": "73b2d8b76aa9b53660032bc8f5d8bee3a3ae4e3b3a7fd49ade81f7347a34aa68",
             "gid": "diprish",
             "key_id": "DEVKEY:AB12",
             "purpose": "device",
-            "signature": "5d9762a3197f1adc77695ee82ad89497bab3fb1e212ece85b04ccd4c5d587c6e4238dbc5d989177b65d26576e5bcc420291cc3dcd0d6d3485158136b6cde0206",
+            "signature": "a4c80a589a98e68bfdff92e0a8ab6a6ced5b543e83a9f17b7165358687719757fbcbb7c9395dc78a51a2a2fd6aaef32f5edbfc07357f8c9e90988b7e3152bd01",
             "subject_key": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618"
           }
         ],
@@ -65,10 +69,11 @@
       "bundle": {
         "devices": [
           {
+            "encryption_key": "ac01b2209e86354fb853237b5de0f4fab13c7fcbf433a61c019369617fecf10b",
             "gid": "mallory",
             "key_id": "DEVKEY:AB12",
             "purpose": "device",
-            "signature": "54afb6fe4746f9259d107a9f5304d082a04b080d3432d8b3c76a692f44dc3216f75cc8e1316f45d3648bc85147058eaae29e92b7eb7d26aafe746deb4c97e00c",
+            "signature": "f16bc901e9df91cb24462912e648221a8a2d501f9f685434a2266ba0a0832547fe217c8f8cc8e1cefdac2ee00c0f5378abcd20e7dbf3babfcd8ae2916db0f106",
             "subject_key": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
           }
         ],
